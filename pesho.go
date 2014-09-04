@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 )
@@ -66,6 +67,9 @@ func printDefaultConfig() {
 }
 
 func main() {
+
+	runtime.GOMAXPROCS(1)
+
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	if flag.NArg() > 0 {
