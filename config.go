@@ -6,6 +6,33 @@ import (
 	"io/ioutil"
 )
 
+type TLSConfig struct {
+	Listen   string
+	CertFile string
+	KeyFile  string
+}
+
+type WebConfig struct {
+	Listen string
+	TLS    *TLSConfig
+}
+
+type DoorConfig struct {
+	Pins         PinsConfig
+	MaxMotorTime int
+}
+
+type PinsConfig struct {
+	// outputs
+	LatchEnable int
+	LatchLock   int
+	LatchUnlock int
+	// inputs
+	SenseLocked   int
+	SenseUnlocked int
+	SenseDoor     int
+}
+
 type Config struct {
 	Door DoorConfig
 	Web  WebConfig

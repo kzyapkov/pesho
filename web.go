@@ -7,17 +7,6 @@ import (
 	"net/http"
 )
 
-type TLSConfig struct {
-	Listen   string
-	CertFile string
-	KeyFile  string
-}
-
-type WebConfig struct {
-	Listen string
-	TLS    *TLSConfig
-}
-
 type PeshoWeb struct {
 	door Door
 }

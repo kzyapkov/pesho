@@ -10,11 +10,6 @@ import (
 	"github.com/kzyapkov/gpio"
 )
 
-type DoorConfig struct {
-	Pins         PinsConfig
-	MaxMotorTime int
-}
-
 type Door interface {
 	Subscribe(chan DoorState) <-chan DoorState // Returns a channel of sensor events
 	Unsubscribe(<-chan DoorState) error        // Channel will get no more notifications of events
@@ -31,17 +26,6 @@ type DoorState struct {
 	Closed   bool      `json:"closed"`    // Whether the door is closed or ajar
 	InFlight bool      `json:"in_flight"` // Whether we are currently changing Locked, in which case Locked is the old value
 	When     time.Time `json:"when"`      // When did this event occur
-}
-
-type PinsConfig struct {
-	// outputs
-	LatchEnable int
-	LatchLock   int
-	LatchUnlock int
-	// inputs
-	SenseLocked   int
-	SenseUnlocked int
-	SenseDoor     int
 }
 
 type door struct {
