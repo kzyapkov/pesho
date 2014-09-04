@@ -1,0 +1,18 @@
+{
+    "_comment": "The default location of this file is /etc/pesho/config.json, settable via --config",
+    "Door": {
+        "Pins": {
+            "LatchEnable": 17,
+            "LatchLock": 54,
+            "LatchUnlock": 57,
+            "SenseLocked": 16,
+            "SenseUnlocked": 7,
+            "SenseDoor": 6
+        },
+        "MaxMotorTime": 300
+    },
+    "Web": {
+        "Listen": ":80",
+        "TLS": null
+    }
+}

@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
-
 	"time"
 
 	"github.com/kzyapkov/gpio"
@@ -27,10 +27,10 @@ type Door interface {
 var ErrNotSubscribed = errors.New("not currently subscribed")
 
 type DoorState struct {
-	Locked   bool      // The state of the mechanical latch, true=locked
-	Closed   bool      // Whether the door is closed or ajar
-	InFlight bool      // Whether we are currently changing Locked, in which case Locked is the old value
-	When     time.Time // When did this event occur
+	Locked   bool      `json:"locked"`    // The state of the mechanical latch, true=locked
+	Closed   bool      `json:"closed"`    // Whether the door is closed or ajar
+	InFlight bool      `json:"in_flight"` // Whether we are currently changing Locked, in which case Locked is the old value
+	When     time.Time `json:"when"`      // When did this event occur
 }
 
 type PinsConfig struct {
@@ -64,6 +64,7 @@ type door struct {
 	closing    chan bool
 }
 
+// NewDoor returns a door for the given configuration
 func NewDoor(cfg DoorConfig) (Door, error) {
 	var err error
 	d := &door{
@@ -73,66 +74,96 @@ func NewDoor(cfg DoorConfig) (Door, error) {
 		return nil, err
 	}
 
-	d.installCallbacks()
+	// find out the initial state
+	if err = d.initState(); err != nil {
+		d.Close()
+		return nil, err
+	}
+
+	// install GPIO input callbacks
+	d.senseLocked.BeginWatch(gpio.EdgeBoth, d.onSenseLocked)
+	d.senseUnlocked.BeginWatch(gpio.EdgeBoth, d.onSenseUnlocked)
+	d.senseDoor.BeginWatch(gpio.EdgeBoth, d.onSenseDoor)
+
+	// this notifies subscribers for events
 	go d.watch()
 
 	return d, nil
 }
 
-func (d *door) installCallbacks() {
-	d.senseLocked.BeginWatch(gpio.EdgeBoth, d.onSenseLocked)
-	d.senseUnlocked.BeginWatch(gpio.EdgeBoth, d.onSenseUnlocked)
-	d.senseDoor.BeginWatch(gpio.EdgeBoth, d.onSenseDoor)
-}
-
-func (d *door) updateState(locked, closed *bool) *DoorState {
+func (d *door) initState() error {
 	d.stateMutex.Lock()
 	defer d.stateMutex.Unlock()
-	prev := &DoorState{}
-	*prev = d.state
-	mutated := false
-	if locked != nil {
-		if d.state.Locked != *locked {
-			d.state.Locked = *locked
-			mutated = true
-		} else {
-			log.Printf("signal for locked, but no change, ignoring %t", *locked)
-		}
+
+	d.state.Closed = d.senseDoor.Get()
+
+	isLocked := d.senseLocked.Get()
+	isUnlocked := d.senseUnlocked.Get()
+	if isLocked == isUnlocked {
+		return fmt.Errorf("Invalid sensor state: locked %t unlocked %t", isLocked, isUnlocked)
+		// XXX: for safety, maybe we should try unlocking the door here and reach a valid state?
 	}
-	if closed != nil {
-		if d.state.Closed != *closed {
-			d.state.Closed = *closed
-			mutated = true
-		} else {
-			log.Printf("signal for closed, but no change, ignoring %t", *closed)
-		}
-	}
-	if mutated {
-		d.state.When = time.Now()
-		d.events <- d.state
-		return prev
-	}
+	d.state.Locked = isLocked
+
+	d.state.When = time.Now()
 	return nil
 }
 
 func (d *door) onSenseLocked() {
 	isLocked := d.senseLocked.Get()
-	_ = d.updateState(&isLocked, nil)
-	log.Printf("locked: %t\n", isLocked)
-	// TODO: handle latch controls!!!
+
+	// No need to serialize read access from pin callbacks, really.
+	if d.state.Locked == isLocked {
+		log.Printf("ignoring locked event %t", isLocked)
+		return
+	}
+
+	// but door.State() can be called from anywhere, so get a write lock
+	d.stateMutex.Lock()
+	defer d.stateMutex.Unlock()
+
+	if d.state.InFlight && !d.state.Locked {
+		// We're moving the latch to locked position, and it hit it.
+		d.latchEnable.Clear()
+		d.latchLock.Clear()
+		d.latchUnlock.Clear()
+		d.state.InFlight = false
+		d.state.Locked = true
+	} else {
+		fmt.Printf("locked event with no effect %t", isLocked)
+	}
+	d.events <- d.state
 }
 
 func (d *door) onSenseUnlocked() {
-	isUnlocked := !d.senseUnlocked.Get()
-	isLocked := !isUnlocked
-	_ = d.updateState(&isLocked, nil)
-	log.Printf("unlocked: %t\n", isUnlocked)
-	// TODO: handle latch controls!!!
+	isUnlocked := d.senseUnlocked.Get()
+
+	if !d.state.Locked == isUnlocked {
+		log.Printf("ignoring unlocked event %t", isUnlocked)
+		return
+	}
+
+	d.stateMutex.Lock()
+	defer d.stateMutex.Unlock()
+
+	if d.state.InFlight && d.state.Locked {
+		// We're unlocking the door, and we hit the unlock position sensor.
+		d.latchEnable.Clear()
+		d.latchLock.Clear()
+		d.latchUnlock.Clear()
+		d.state.InFlight = false
+		d.state.Locked = false
+	} else {
+		fmt.Printf("unlocked event with no effect %t", isUnlocked)
+	}
+	d.events <- d.state
 }
 
 func (d *door) onSenseDoor() {
 	isClosed := d.senseDoor.Get()
-	_ = d.updateState(nil, &isClosed)
+	d.stateMutex.Lock()
+	defer d.stateMutex.Unlock()
+	d.state.Closed = isClosed
 }
 
 func (d *door) watch() {
@@ -151,9 +182,11 @@ func (d *door) notify(state *DoorState) {
 	defer d.subsMutex.Unlock()
 	s := d.subs
 	for s != nil {
-		// XXX: If any of those channels doesn't have capacity,
-		//		this will block with critical consequences! Careful!
-		s.c <- *state
+		if cap(s.c) > 0 {
+			s.c <- *state
+		} else {
+			log.Printf("skip notifying %v, no capacity", s)
+		}
 		s = s.next
 	}
 }
@@ -195,19 +228,24 @@ func (d *door) Subscribe(c chan DoorState) <-chan DoorState {
 func (d *door) Unsubscribe(c <-chan DoorState) error {
 	var s, prev *sub
 	s = d.subs
+
+	d.subsMutex.Lock()
+	defer d.subsMutex.Unlock()
+
 	for s != nil {
+		// find the subscription
 		if s.c != c {
 			prev, s = s, s.next
 			continue
 		}
-		d.subsMutex.Lock()
-		defer d.subsMutex.Unlock()
-		// remove s from the linked list
-		if prev == nil {
-			// this is the first item
+
+		// remove it from the linked list
+		if prev != nil {
+			prev.next = s.next
+		} else {
+			// it's is the first item
 			d.subs = s.next
 		}
-		prev.next = s.next
 		return nil
 	}
 	return ErrNotSubscribed

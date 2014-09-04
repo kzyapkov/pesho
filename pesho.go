@@ -1,5 +1,5 @@
 // pesho, named after Peter the Saint
-//  is the gatekeeper of the premises of initlab.org
+// is the gatekeeper of the premises of initlab.org
 package main
 
 import (
@@ -67,7 +67,7 @@ func printDefaultConfig() {
 
 func main() {
 	flag.Parse()
-
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	if flag.NArg() > 0 {
 		args := flag.Args()
 		if args[0] == "printconfig" {
@@ -89,7 +89,7 @@ func main() {
 
 	go ServeForever(d, cfg.Web)
 
-	// TODO: in our show tonight, listen to events and display them!
+	// just some demo code, listen to events and display them!
 	doorEvents := d.Subscribe(nil)
 	for err == nil {
 		select {
@@ -101,4 +101,7 @@ func main() {
 		}
 	}
 
+	// TODO: implement a governor for the events
+
+	// TODO: implement the web service
 }

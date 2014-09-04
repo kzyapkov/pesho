@@ -22,6 +22,11 @@ type PeshoWeb struct {
 	door Door
 }
 
+func setHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Server", "pesho/0.1")
+}
+
 func (p *PeshoWeb) handleOpen(w http.ResponseWriter, r *http.Request) {
 
 }
@@ -31,7 +36,7 @@ func (p *PeshoWeb) handleClose(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *PeshoWeb) handleStatus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	setHeaders(w)
 	data, err := json.MarshalIndent(p.door.State(), "", "    ")
 	if err != nil {
 		msg := fmt.Sprintf("Unable to read door state: %v", err)
@@ -44,7 +49,10 @@ func (p *PeshoWeb) handleStatus(w http.ResponseWriter, r *http.Request) {
 func ServeForever(d Door, cfg WebConfig) {
 	p := &PeshoWeb{door: d}
 	http.Handle("/status", restrictMethod(http.HandlerFunc(p.handleStatus), "GET"))
-	http.ListenAndServe(cfg.Listen, nil)
+	err := http.ListenAndServe(cfg.Listen, nil)
+	if err != nil {
+		log.Panicf("web: %v")
+	}
 	if cfg.TLS != nil {
 		log.Print("TLS not yet implemented")
 	}
