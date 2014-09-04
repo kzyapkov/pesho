@@ -52,10 +52,11 @@ func config(filename string) (cfg *Config) {
 	cfg, err = LoadConfigFromFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Print("File '%s' does not exist, using default configuration")
-			return
+			log.Printf("File '%s' does not exist, using default configuration", filename)
+			cfg, _ = LoadConfig(nil)
+			return cfg
 		}
-		log.Panicf("Config file could not be parsed: %v", err)
+		log.Fatalf("Config file could not be parsed: %v", err)
 	}
 	return cfg
 }
@@ -81,6 +82,8 @@ func main() {
 	}
 
 	cfg := config(*configPath)
+
+	log.Printf("config:\n%#v", *cfg)
 
 	// The hardware link
 	d, err := NewDoor(cfg.Door)
