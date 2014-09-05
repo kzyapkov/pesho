@@ -1,24 +1,13 @@
-package main
+package config_test
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/kzyapkov/pesho/config"
 )
 
-func TestPrintDefault(t *testing.T) {
-	c, err := LoadConfig(nil)
-	if err != nil {
-		t.Error(err)
-	}
-	data, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		t.Error(err)
-	}
-	t.Log(string(data))
-}
-
 func TestDefaultConfig(t *testing.T) {
-	c, err := LoadConfig([]byte("{}"))
+	c, err := config.LoadFromBytes([]byte("{}"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -29,7 +18,7 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestLoadSomeConfigValues(t *testing.T) {
-	c, err := LoadConfig([]byte(`{"Door":{"Pins":{"SenseUnlocked":99}}}`))
+	c, err := config.LoadFromBytes([]byte(`{"Door":{"Pins":{"SenseUnlocked":99}}}`))
 	if err != nil {
 		t.Error(err)
 	}

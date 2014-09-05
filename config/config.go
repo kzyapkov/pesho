@@ -1,9 +1,11 @@
-package main
+package config
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"os"
 )
 
 type TLSConfig struct {
@@ -41,13 +43,13 @@ type Config struct {
 var defaultCfg = Config{
 	Door: DoorConfig{
 		Pins: PinsConfig{
-			LatchEnable: 17,
-			LatchLock:   54,
-			LatchUnlock: 57,
+			LatchEnable: 39,
+			LatchLock:   38,
+			LatchUnlock: 37,
 
-			SenseLocked:   16,
-			SenseUnlocked: 7,
-			SenseDoor:     6,
+			SenseLocked:   60,
+			SenseUnlocked: 25,
+			SenseDoor:     23,
 		},
 		MaxMotorTime: 300,
 	},
@@ -79,7 +81,7 @@ func checkConfig(c *Config) error {
 	return nil
 }
 
-func LoadConfig(data []byte) (c *Config, err error) {
+func LoadFromBytes(data []byte) (c *Config, err error) {
 	var cfg Config
 	cfg = defaultCfg // copy the default into the new structure
 	if data != nil {
@@ -99,5 +101,19 @@ func LoadConfigFromFile(filename string) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return LoadConfig(data)
+	return LoadFromBytes(data)
+}
+
+func LoadConfig(filename string) (cfg *Config) {
+	var err error
+	cfg, err = LoadConfigFromFile(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("File '%s' does not exist, using default configuration", filename)
+			cfg, _ = LoadFromBytes(nil)
+			return cfg
+		}
+		log.Fatalf("Config file could not be parsed: %v", err)
+	}
+	return cfg
 }

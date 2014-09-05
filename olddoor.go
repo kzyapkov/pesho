@@ -1,3 +1,5 @@
+// +build skip
+
 package main
 
 import (
@@ -58,8 +60,8 @@ type door struct {
 	closing   chan bool
 }
 
-// NewDoor returns a door for the given configuration
-func NewDoor(cfg DoorConfig) (Door, error) {
+// NewDoorFromConfig returns a door for the given configuration
+func NewDoorFromConfig(cfg DoorConfig) (Door, error) {
 	var err error
 	d := &door{
 		events:       make(chan DoorState, 15),
@@ -234,7 +236,7 @@ func (d *door) Unlock() error {
 	return d.waitForLatch()
 }
 
-func (d *door)waitForLatch() error {
+func (d *door) waitForLatch() error {
 	updates := d.Subscribe(nil)
 	defer d.Unsubscribe(updates)
 
@@ -283,7 +285,6 @@ func (d *door)waitForLatch() error {
 		}
 	}
 }
-
 
 func (d *door) State() DoorState {
 	d.stateLock.RLock()

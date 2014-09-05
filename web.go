@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/kzyapkov/pesho/config"
+	"github.com/kzyapkov/pesho/door"
 )
 
 type PeshoWeb struct {
-	door Door
+	door door.Door
 }
 
 func setHeaders(w http.ResponseWriter) {
@@ -35,7 +38,7 @@ func (p *PeshoWeb) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func ServeForever(d Door, cfg WebConfig) {
+func ServeForever(d door.Door, cfg config.WebConfig) {
 	p := &PeshoWeb{door: d}
 	http.Handle("/status", restrictMethod(http.HandlerFunc(p.handleStatus), "GET"))
 	err := http.ListenAndServe(cfg.Listen, nil)

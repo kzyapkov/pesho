@@ -12,12 +12,15 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+
+	"github.com/kzyapkov/pesho/config"
+	"github.com/kzyapkov/pesho/door"
 )
 
 var configPath = flag.String("config", "/etc/pesho/config.json", "Configuration file")
 
 type pesho struct {
-	door      Door
+	door      door.Door
 	closeOnce sync.Once
 }
 
@@ -40,53 +43,44 @@ func (p *pesho) Close() {
 }
 
 func (p *pesho) close() {
-
 	if p.door != nil {
 		p.door.Close()
 	}
-
-}
-
-func config(filename string) (cfg *Config) {
-	var err error
-	cfg, err = LoadConfigFromFile(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("File '%s' does not exist, using default configuration", filename)
-			cfg, _ = LoadConfig(nil)
-			return cfg
-		}
-		log.Fatalf("Config file could not be parsed: %v", err)
-	}
-	return cfg
 }
 
 func printDefaultConfig() {
-	cfg, _ := LoadConfig(nil)
+	cfg, _ := config.LoadFromBytes(nil)
 	data, _ := json.MarshalIndent(cfg, "", "    ")
 	fmt.Print(string(data))
+	os.Exit(0)
+}
+
+func maybeSubcommand() {
+	if flag.NArg() == 0 {
+		return
+	}
+	args := flag.Args()
+
+	switch args[0] {
+	case "printconfig":
+		printDefaultConfig()
+	}
 }
 
 func main() {
 
 	runtime.GOMAXPROCS(1)
-
-	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	if flag.NArg() > 0 {
-		args := flag.Args()
-		if args[0] == "printconfig" {
-			printDefaultConfig()
-			os.Exit(0)
-		}
-	}
+	flag.Parse()
 
-	cfg := config(*configPath)
+	maybeSubcommand()
+
+	cfg := config.LoadConfig(*configPath)
 
 	log.Printf("config:\n%#v", *cfg)
 
 	// The hardware link
-	d, err := NewDoor(cfg.Door)
+	d, err := door.NewFromConfig(cfg.Door)
 	if err != nil {
 		log.Panicf("Could not init GPIOs: %v", err)
 	}
@@ -101,7 +95,7 @@ func main() {
 	for err == nil {
 		select {
 		case evt := <-doorEvents:
-			log.Printf("locked: %t, closed: %t at %v\n", evt.Locked, evt.Closed, evt.When)
+			log.Printf("%v\n", evt)
 		case <-irq:
 			log.Print("\nShutting down...\n")
 			return
