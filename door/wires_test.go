@@ -25,6 +25,14 @@ func getTestWires() *wires {
 	return w
 }
 
+func initWires(w *wires, locked bool) {
+	w.locked.(*test.PinMock).TheValue = false
+	w.unlocked.(*test.PinMock).TheValue = false
+	w.door.(*test.PinMock).TheValue = false
+
+	w.reset()
+}
+
 func TestCreatePins(t *testing.T) {
 	var m doorAutomata
 	m = getTestWires()
@@ -43,10 +51,10 @@ func TestInitialStateLocked(t *testing.T) {
 
 	m.reset()
 
-	if state.latch != Locked {
+	if state.Latch != Locked {
 		t.Error("latch should be locked")
 	}
-	if state.door != Closed {
+	if state.Door != Closed {
 		t.Error("door should be closed")
 	}
 }
@@ -63,14 +71,15 @@ func TestInitialStateInvalid(t *testing.T) {
 
 	m.reset()
 
-	if state.latch != Unknown {
+	if state.Latch != Unknown {
 		t.Error("latch should be unknown")
 	}
-	if state.door != Open {
+	if state.Door != Open {
 		t.Error("door should be open")
 	}
 }
 
 func TestHandleLocked(t *testing.T) {
-
+	w := getTestWires()
+	_ = w
 }

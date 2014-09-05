@@ -4,6 +4,7 @@ import (
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/kzyapkov/gpio"
 )
@@ -14,8 +15,8 @@ type doorAutomata interface {
 	handleSenseLocked()
 	handleSenseUnlocked()
 	handleSenseDoor()
-	requestLock() State, error
-	requestUnlock() State, error
+	requestLock() (State, error)
+	requestUnlock() (State, error)
 	reset()
 }
 
@@ -35,6 +36,7 @@ type wires struct {
 	// serialize access to the state
 	*sync.Mutex
 	state State
+	timer time.Timer
 }
 
 func (w *wires) stateDelegate(delegate stateListener) {
@@ -225,12 +227,12 @@ func (w *wires) handleSenseDoor() {
 	}
 }
 
-func (w *wires) requestLock() {
-
+func (w *wires) requestLock() (State, error) {
+	return State{}, nil
 }
 
-func (w *wires) requestUnlock() {
-
+func (w *wires) requestUnlock() (State, error) {
+	return State{}, nil
 }
 
 func (w *wires) latchTimeout() {
