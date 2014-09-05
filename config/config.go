@@ -20,8 +20,8 @@ type WebConfig struct {
 }
 
 type DoorConfig struct {
-	Pins         PinsConfig
-	MaxMotorTime int
+	Pins              PinsConfig
+	MaxMotorRuntimeMs int
 }
 
 type PinsConfig struct {
@@ -51,7 +51,7 @@ var defaultCfg = Config{
 			SenseUnlocked: 25,
 			SenseDoor:     23,
 		},
-		MaxMotorTime: 300,
+		MaxMotorRuntimeMs: 320,
 	},
 	Web: WebConfig{
 		Listen: ":80",

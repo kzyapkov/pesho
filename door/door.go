@@ -74,7 +74,10 @@ type Door interface {
 
 type door struct {
 	machine doorAutomata
-	state   State
+	state   struct {
+		*State
+		sync.Mutex
+	}
 
 	subsMutex *sync.Mutex
 	subs      *sub
@@ -82,7 +85,7 @@ type door struct {
 }
 
 func (d *door) State() State {
-	return d.state
+	return *d.state.State
 }
 func (d *door) Lock() error {
 	d.machine.requestLock()
@@ -94,23 +97,27 @@ func (d *door) Unlock() error {
 }
 
 func (d *door) notify(new State) {
-	old := d.state
-	d.state = new
+	// TODO: get rid of the mutex, implement these notifications
+	//       with a single long-living goroutine and a channel
+	go func() {
+		d.state.Lock()
+		defer d.state.Unlock()
+		old := *d.state.State
+		d.state.State = &new
+		var evt *DoorEvent = &DoorEvent{old, new, time.Now()}
 
-	var evt *DoorEvent = &DoorEvent{old, new, time.Now()}
-
-	d.subsMutex.Lock()
-	defer d.subsMutex.Unlock()
-	s := d.subs
-	for s != nil {
-		if cap(s.c) > 0 {
-			s.c <- evt
-		} else {
-			log.Printf("skip notifying %v, no capacity", s)
+		d.subsMutex.Lock()
+		defer d.subsMutex.Unlock()
+		s := d.subs
+		for s != nil {
+			if cap(s.c) > 0 {
+				s.c <- evt
+			} else {
+				log.Printf("skip notifying %v, no capacity", s)
+			}
+			s = s.next
 		}
-		s = s.next
-	}
-
+	}()
 }
 
 type sub struct {
@@ -165,10 +172,10 @@ func NewFromConfig(cfg config.DoorConfig) (Door, error) {
 	d := &door{
 		subsMutex: &sync.Mutex{},
 	}
-	m, err := connectPins(
+	m, err := wireUp(
 		cfg.Pins.SenseLocked, cfg.Pins.SenseUnlocked, cfg.Pins.SenseDoor,
 		cfg.Pins.LatchEnable, cfg.Pins.LatchLock, cfg.Pins.LatchUnlock,
-		d.notify,
+		cfg.MaxMotorRuntimeMs, d.notify,
 	)
 	if err != nil {
 		return nil, err
