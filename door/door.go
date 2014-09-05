@@ -11,7 +11,12 @@ import (
 	"github.com/kzyapkov/pesho/config"
 )
 
-var ErrNotSubscribed = errors.New("not currently subscribed")
+var (
+	ErrNotSubscribed = errors.New("not currently subscribed")
+	ErrTimeout       = errors.New("Internal operation timeout")
+	ErrInternal = errors.New("Internal machinery error")
+	ErrNotDone = erorrs.New("the requested door operation was not completed")
+)
 
 type State struct {
 	Latch LatchState
@@ -88,12 +93,64 @@ func (d *door) State() State {
 	return *d.state.State
 }
 func (d *door) Lock() error {
-	d.machine.requestLock()
-	// TODO: wait for completion
-	return nil
+	state, err := d.machine.requestLock()
+	if err != nil {
+		return err
+	}
+	if state.Latch == Locked {
+		return nil // All good, we're locked
+	}
+	if state.Latch != Locking {
+		log.Printf(" *** THIS IS BAD *** while locking, state=(%#v) but no error?", state)
+		return ErrInternal
+	}
+	updates := d.Subscribe(nil)
+	defer d.Unsubscribe(updates)
+	for {
+		select {
+		case state = <-updates:
+			if state.Latch == Locked {
+				return nil
+			}
+			if state.Latch != Locking {
+				return ErrNotDone
+			}
+		case <-time.After(1 * time.Second):
+			return ErrTimeout
+		}
+	}
+	log.Panic("this line should never be reached")
+	return ErrInternal
 }
 func (d *door) Unlock() error {
-	return nil
+	state, err := d.machine.requestUnlock()
+	if err != nil {
+		return err
+	}
+	if state.Latch == Unlocked {
+		return nil
+	}
+	if state.Latch != Unlocking {
+		log.Printf(" *** THIS IS BAD *** while locking, state=(%#v) but no error?", state)
+		return ErrInternal
+	}
+	updates := d.Subscribe(nil)
+	defer d.Unsubscribe(updates)
+	for {
+		select {
+		case state = <-updates:
+			if state.Latch == Unlocked {
+				return nil
+			}
+			if state.Latch != Unlocking {
+				return ErrNotDone
+			}
+		case <-time.After(1 * time.Second):
+			return ErrTimeout
+		}
+	}
+	log.Panic("this line should never be reached")
+	return ErrInternal
 }
 
 func (d *door) notify(new State) {

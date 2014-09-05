@@ -12,7 +12,7 @@ import (
 
 var (
 	ErrDoorOpen   = errors.New("door is open")
-	ErrNotHandled = errors.New("don't know how to handle this signal229")
+	ErrNotHandled = errors.New("don't know how to handle this signal")
 )
 
 type stateListener func(State)
