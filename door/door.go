@@ -23,6 +23,28 @@ type State struct {
 	Door  DoorState
 }
 
+func (s *State) String() string {
+	var door, latch string
+	switch s.Door {
+	case Open:
+		door = "Open"
+	case Closed:
+		door = "Closed"
+	}
+	switch s.Latch {
+	case Locked:
+		latch = "Locked"
+	case Unlocked:
+		latch = "Unlocked"
+	case Locking:
+	case Unlocking:
+		latch = "In flight ..."
+	default:
+		latch = "UNKNOWN"
+	}
+	return "State{Door: " + door + ", Latch: " + latch + "}"
+}
+
 func (s *State) IsOpen() bool {
 	return s.Door == Open
 }
