@@ -2,19 +2,32 @@
 
 Named after St. Peter, the gatekeeper of the physical premises of initlab.org
 
-## Overview
+The rest of this page is in Bulgarian and should not be read by anyone.
 
-pesho is a daemon program controlling an electromechanical door latch. 
-It was designed to run on a [small ARM-based Linux board](https://www.olimex.com/Products/OLinuXino/iMX233/iMX233-OLinuXino-MAXI/). Pesho is written in Go.
+## Жици
 
-To control the door, users can use a simple web interface:
- * POST /door/unlock to unlock the door
- * POST /door/lock to lock the door
- * GET /door/status for a json-encoded representation of the current door state.
+Пешо чете 3 датчика на вратата:
+ * "шиповете са извадени", на бравата BLK, в кода "locked"
+ * "шиповете са прибрани", на бравата BUK, в кода "unlocked"
+ * "вратата е затворена", на бравата BD, в кода "door"
 
-## Misc
+Пешо цъка 3 релета. 2 от тях определят в каква посока ще се движат шиповете,
+третото затваря веригата. То е там, за да може с акумулатор и тайни жици да
+се манипулира вратата в случай на нужда.
 
- * [Nice GPIO map](http://azug.minpet.unibas.ch/~lukas/bricol/olinuxino-imx233/index.html#GPIO)
+На платката с релетата има 2x5 конектор за лентов кабел, pinout и връзване към RPi:
+
+| GPIO   |     бележки       |     |        | бележки                | GPIO |
+|--------|-------------------|-----|--------|------------------------|------|
+|        | обща маса         | GND | 3.3V   | от RPi, за оптроните   |      |
+|        |                   | N/C | N/C    |                        |      |
+| 25     | датчик "unlocked" | BUK | EN     | задвижва мотора        | 10   |
+| 8      | датчик "door"     | BD  | LOCK   | посока заключване      | 9    |
+| 7      | датчик "locked"   | BLK | UNLOCK | посока отключване      | 11   |
+
+Закачени са и два големи бутона на кутията -- за отваряне и затваряне.
+Те замасяват GPIO0 и GPIO1. (щото там вече има pull-up резистори, пък
+на платката не остана много място).
 
 ## License
 
@@ -25,7 +38,7 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
 1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer. 
+   list of conditions and the following disclaimer.
 2. Redistributions in binary form must reproduce the above copyright notice,
    this list of conditions and the following disclaimer in the documentation
    and/or other materials provided with the distribution.
@@ -42,5 +55,5 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The views and conclusions contained in the software and documentation are those
-of the authors and should not be interpreted as representing official policies, 
+of the authors and should not be interpreted as representing official policies,
 either expressed or implied, of the FreeBSD Project.
