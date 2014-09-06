@@ -43,7 +43,7 @@ func ServeForever(d door.Door, cfg config.WebConfig) {
 	http.Handle("/status", restrictMethod(http.HandlerFunc(p.handleStatus), "GET"))
 	err := http.ListenAndServe(cfg.Listen, nil)
 	if err != nil {
-		log.Panicf("web: %v")
+		log.Panicf("web: %v", err)
 	}
 	if cfg.TLS != nil {
 		log.Print("TLS not yet implemented")

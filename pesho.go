@@ -95,7 +95,7 @@ func main() {
 	for err == nil {
 		select {
 		case evt := <-doorEvents:
-			log.Printf("%v\n", evt)
+			log.Printf("Door changed state from %#v to %#v at %s\n", evt.Old, evt.New, evt.When)
 		case <-irq:
 			log.Print("\nShutting down...\n")
 			return

@@ -14,8 +14,8 @@ import (
 var (
 	ErrNotSubscribed = errors.New("not currently subscribed")
 	ErrTimeout       = errors.New("Internal operation timeout")
-	ErrInternal = errors.New("Internal machinery error")
-	ErrNotDone = erorrs.New("the requested door operation was not completed")
+	ErrInternal      = errors.New("Internal machinery error")
+	ErrNotDone       = errors.New("the requested door operation was not completed")
 )
 
 type State struct {
@@ -103,7 +103,7 @@ type door struct {
 	machine doorAutomata
 	state   struct {
 		*State
-		sync.Mutex
+		*sync.Mutex
 	}
 
 	subsMutex *sync.Mutex
@@ -130,7 +130,8 @@ func (d *door) Lock() error {
 	defer d.Unsubscribe(updates)
 	for {
 		select {
-		case state = <-updates:
+		case evt := <-updates:
+			state = evt.New
 			if state.Latch == Locked {
 				return nil
 			}
@@ -160,7 +161,8 @@ func (d *door) Unlock() error {
 	defer d.Unsubscribe(updates)
 	for {
 		select {
-		case state = <-updates:
+		case evt := <-updates:
+			state = evt.New
 			if state.Latch == Unlocked {
 				return nil
 			}
@@ -251,6 +253,8 @@ func NewFromConfig(cfg config.DoorConfig) (Door, error) {
 	d := &door{
 		subsMutex: &sync.Mutex{},
 	}
+	d.state.State = &State{}
+	d.state.Mutex = &sync.Mutex{}
 	m, err := wireUp(
 		cfg.Pins.SenseLocked, cfg.Pins.SenseUnlocked, cfg.Pins.SenseDoor,
 		cfg.Pins.LatchEnable, cfg.Pins.LatchLock, cfg.Pins.LatchUnlock,

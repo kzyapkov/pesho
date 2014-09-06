@@ -305,6 +305,7 @@ func wireUp(lockedN, unlockedN, doorN, enableN, lockN, unlockN int,
 	maxMotorRuntimeMs int, delegate stateListener) (m doorAutomata, err error) {
 
 	openPins := make([]gpio.Pin, 6)
+	var i int
 	var savedError error
 
 	mustPin := func(n int, mode gpio.Mode) gpio.Pin {
@@ -312,7 +313,8 @@ func wireUp(lockedN, unlockedN, doorN, enableN, lockN, unlockN int,
 			savedError = err
 			panic(err)
 		} else {
-			openPins[len(openPins)] = pin
+			openPins[i] = pin
+			i++
 			return pin
 		}
 	}
@@ -323,6 +325,9 @@ func wireUp(lockedN, unlockedN, doorN, enableN, lockN, unlockN int,
 				panic(n)
 			}
 			for _, p := range openPins {
+				if p == nil {
+					return
+				}
 				p.Close()
 				err = savedError
 			}
