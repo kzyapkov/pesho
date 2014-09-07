@@ -31,25 +31,31 @@ type doorAutomata interface {
 type sensors struct {
 	locked   gpio.Pin
 	unlocked gpio.Pin
-	door     gpio.Pin // high means closed
-}
-
-func readPin(pin gpio.Pin, invert bool) bool {
-	value := pin.Get()
-	// neat xor trick
-	return value != invert
+	door     gpio.Pin
 }
 
 func (s *sensors) readLocked() bool {
-	return readPin(s.locked, false)
+	return !s.locked.Get() // closed switch (latch engaged) => low level on GPIO
+}
+
+func (s *sensors) watchLocked(f func()) error {
+	return s.locked.BeginWatch(gpio.EdgeFalling, f)
 }
 
 func (s *sensors) readUnlocked() bool {
-	return readPin(s.unlocked, false)
+	return !s.unlocked.Get() // closed switch (latch disengaged) => low level on GPIO
 }
 
-func (s *sensors) readDoor() bool {
-	return readPin(s.door, false)
+func (s *sensors) watchUnlocked(f func()) error {
+	return s.unlocked.BeginWatch(gpio.EdgeFalling, f)
+}
+
+func (s *sensors) readDoorClosed() bool {
+	return !s.door.Get() // switch closed (door closed) => low level on GPIO
+}
+
+func (s sensors) watchDoor(f func()) error {
+	return s.door.BeginWatch(gpio.EdgeBoth, f)
 }
 
 // updateLatchState doesn't know about transitions
@@ -68,7 +74,7 @@ func (s *sensors) updateLatchState(state *State) {
 }
 
 func (s *sensors) updateDoorState(state *State) {
-	isClosed := s.readDoor()
+	isClosed := s.readDoorClosed()
 	if isClosed {
 		state.Door = Closed
 	} else {
@@ -89,13 +95,11 @@ type controls struct {
 }
 
 func (c *controls) startLocking() {
-	c.unlock.Clear()
 	c.lock.Set()
 	c.enable.Set()
 }
 
 func (c *controls) startUnlocking() {
-	c.lock.Clear()
 	c.unlock.Set()
 	c.enable.Set()
 }
@@ -112,6 +116,8 @@ type wires struct {
 
 	// maximum time for the motor to be on
 	maxMotorRuntime time.Duration
+
+	startedAt time.Time
 
 	// where to send state changes
 	delegate stateListener
@@ -134,6 +140,7 @@ func (w *wires) startLatchTimer() {
 		w.cancelLatchTimer()
 	}
 	w.timer = time.AfterFunc(w.maxMotorRuntime, w.latchTimeout)
+	w.startedAt = time.Now()
 }
 
 func (w *wires) handleSenseLocked() {
@@ -144,17 +151,22 @@ func (w *wires) handleSenseLocked() {
 	case Locking:
 		// we're done locking
 		w.stopMotor()
+		w.cancelLatchTimer()
 		w.state.Latch = Locked
 		w.onState()
+		lasted := time.Now().Sub(w.startedAt)
+		log.Printf("handleSenseLocked: done Locking in %s, %s", lasted, w.state.String())
 	case Unknown:
+		log.Printf("handleSenseLocked: found unknown, %s", w.state.String())
 		var new State
 		w.updateLatchState(&new)
 		if new.Latch != Unknown {
+			log.Printf("handleSenseLocked: recovered to %s", new.String())
 			w.state.Latch = new.Latch
 			w.onState()
 		}
 	default:
-		log.Printf("%#v, ignoring lock event", w.state)
+		log.Printf("handleSenseLocked: ignoring, %s", w.state.String())
 	}
 }
 
@@ -169,15 +181,19 @@ func (w *wires) handleSenseUnlocked() {
 		w.cancelLatchTimer()
 		w.state.Latch = Unlocked
 		w.onState()
+		lasted := time.Now().Sub(w.startedAt)
+		log.Printf("handleSenseUnlocked: done unlocking in %s, %s", lasted, w.state.String())
 	case Unknown:
+		log.Printf("handleSenseUnlocked: found unknown, %s", w.state.String())
 		var new State
 		w.updateLatchState(&new)
 		if new.Latch != Unknown {
+			log.Printf("handleSenseUnlocked: recovered to %s", new.String())
 			w.state.Latch = new.Latch
 			w.onState()
 		}
 	default:
-		log.Printf("%v, ignoring unlock event", w.state)
+		log.Printf("handleSenseUnlocked: ignoring, %s", w.state.String())
 	}
 }
 
@@ -212,7 +228,7 @@ func (w *wires) requestLock() (State, error) {
 		fallthrough
 	case Unlocked:
 		// only if the door is closed
-		if w.state.Door != Closed {
+		if w.state.IsOpen() {
 			return w.state, ErrDoorOpen
 		}
 		w.state.Latch = Locking
@@ -255,12 +271,16 @@ func (w *wires) requestUnlock() (State, error) {
 func (w *wires) latchTimeout() {
 	w.stopMotor() // grind gears. not. wait for mutex. not?
 
+	log.Print("latchTimeout triggered")
+
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
 	var state State
 	w.updateLatchState(&state)
-	if state.Latch != w.state.Latch {
+	isNew := state.Latch != w.state.Latch
+	log.Printf("latchTimeout: state %s, will update: %t", state.String(), isNew)
+	if isNew {
 		w.state.Latch = state.Latch
 		w.onState()
 	}
@@ -270,7 +290,9 @@ func (w *wires) latchTimeout() {
 // delegate must not block.
 func (w *wires) setDelegate(delegate stateListener) {
 	w.delegate = delegate
-	w.reset()
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	w.onState()
 }
 
 // onState should only be called from within GPIO callbacks
@@ -294,9 +316,9 @@ func (w *wires) reset() {
 
 	if state.Same(&w.state) {
 		return
-		log.Printf("reset: same state %#v", state)
+		log.Printf("reset: same state %s", state.String())
 	}
-	log.Printf("reset: %#v -> %#v ", w.state, state)
+	log.Printf("reset: %s -> %s ", w.state.String(), state.String())
 	w.state = state
 	w.onState()
 }
@@ -357,26 +379,26 @@ func wireUp(lockedN, unlockedN, doorN, enableN, lockN, unlockN int,
 	return w, nil
 }
 
-type batchwatch struct {
+type batch struct {
 	err error
 }
 
-func (w batchwatch) watch(pin gpio.Pin, edge gpio.Edge, f gpio.IRQEvent) {
+func (w batch) do(f func(func()) error, cb func()) {
 	if w.err != nil {
 		return
 	}
-	err := pin.BeginWatch(edge, f)
+	err := f(cb)
 	if err != nil {
 		w.err = err
 	}
 }
 
 func (w *wires) callbacks() error {
-	var wb batchwatch
-	wb.watch(w.locked, gpio.EdgeFalling, w.handleSenseLocked)
-	wb.watch(w.unlocked, gpio.EdgeFalling, w.handleSenseUnlocked)
-	wb.watch(w.door, gpio.EdgeBoth, w.handleSenseDoor)
-	return wb.err
+	var b batch
+	b.do(w.watchLocked, w.handleSenseLocked)
+	b.do(w.watchUnlocked, w.handleSenseUnlocked)
+	b.do(w.watchDoor, w.handleSenseDoor)
+	return b.err
 }
 
 func (w *wires) close() error {

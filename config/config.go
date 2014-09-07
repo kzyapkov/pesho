@@ -35,26 +35,37 @@ type PinsConfig struct {
 	SenseDoor     int
 }
 
+type ButtonsConfig struct {
+	Red, Green int
+}
+
 type Config struct {
-	Door DoorConfig
-	Web  WebConfig
+	Door    DoorConfig
+	Buttons ButtonsConfig
+	Web     WebConfig
 }
 
 var defaultCfg = Config{
 	Door: DoorConfig{
 		Pins: PinsConfig{
-			LatchEnable: 39,
-			LatchLock:   38,
-			LatchUnlock: 37,
-
-			SenseLocked:   60,
+			// output GPIOs
+			LatchEnable: 9,
+			LatchLock:   10,
+			LatchUnlock: 11,
+			// input GPIOs
+			SenseLocked:   7,
 			SenseUnlocked: 25,
-			SenseDoor:     23,
+			SenseDoor:     8,
 		},
-		MaxMotorRuntimeMs: 320,
+		MaxMotorRuntimeMs: 320, // in ms
+	},
+	Buttons: ButtonsConfig{
+		// GPIOs for the big red and green buttons
+		Red:   0,
+		Green: 1,
 	},
 	Web: WebConfig{
-		Listen: ":80",
+		Listen: ":82",
 	},
 }
 

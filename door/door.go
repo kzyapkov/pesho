@@ -37,10 +37,13 @@ func (s *State) String() string {
 	case Unlocked:
 		latch = "Unlocked"
 	case Locking:
+		latch = "Locking"
 	case Unlocking:
-		latch = "In flight ..."
+		latch = "Unlocking"
+	case Unknown:
+		latch = "Unknown"
 	default:
-		latch = "UNKNOWN"
+		latch = "**FIXME**"
 	}
 	return "State{Door: " + door + ", Latch: " + latch + "}"
 }
@@ -112,8 +115,11 @@ type door struct {
 }
 
 func (d *door) State() State {
+	d.state.Lock()
+	defer d.state.Unlock()
 	return *d.state.State
 }
+
 func (d *door) Lock() error {
 	state, err := d.machine.requestLock()
 	if err != nil {
@@ -154,7 +160,7 @@ func (d *door) Unlock() error {
 		return nil
 	}
 	if state.Latch != Unlocking {
-		log.Printf(" *** THIS IS BAD *** while locking, state=(%#v) but no error?", state)
+		log.Printf(" *** THIS IS BAD *** while unlocking, state=(%#v) but no error?", state)
 		return ErrInternal
 	}
 	updates := d.Subscribe(nil)
@@ -178,7 +184,7 @@ func (d *door) Unlock() error {
 }
 
 func (d *door) notify(new State) {
-	// TODO: get rid of the mutex, implement these notifications
+	// TODO: implement these notifications
 	//       with a single long-living goroutine and a channel
 	go func() {
 		d.state.Lock()

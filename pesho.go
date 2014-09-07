@@ -78,15 +78,19 @@ func main() {
 	cfg := config.LoadConfig(*configPath)
 
 	log.Printf("config:\n%#v", *cfg)
+	log.Printf("PID: %d", os.Getpid())
 
 	// The hardware link
 	d, err := door.NewFromConfig(cfg.Door)
 	if err != nil {
-		log.Panicf("Could not init GPIOs: %v", err)
+		log.Fatalf("Could not init GPIOs: %v", err)
 	}
 
-	irq := make(chan os.Signal)
-	signal.Notify(irq, os.Interrupt, syscall.SIGTERM)
+	die := make(chan os.Signal)
+	signal.Notify(die, os.Interrupt, syscall.SIGTERM)
+
+	toggle := make(chan os.Signal)
+	signal.Notify(toggle, syscall.SIGHUP)
 
 	go ServeForever(d, cfg.Web)
 
@@ -95,10 +99,29 @@ func main() {
 	for err == nil {
 		select {
 		case evt := <-doorEvents:
-			log.Printf("Door changed state from %#v to %#v at %s\n", evt.Old, evt.New, evt.When)
-		case <-irq:
+			log.Printf("Now %s, was %s at %s\n", evt.New.String(), evt.Old.String(), evt.When)
+		case <-die:
 			log.Print("\nShutting down...\n")
 			return
+		case <-toggle:
+			state := d.State()
+			if state.IsLocked() {
+				log.Print("Trying Unlock...")
+				go func() {
+					var err = d.Unlock()
+					if err != nil {
+						log.Printf("Unlock: %v", err)
+					}
+				}()
+			} else {
+				log.Print("Trying Lock...")
+				go func() {
+					var err = d.Lock()
+					if err != nil {
+						log.Printf("Lock: %v", err)
+					}
+				}()
+			}
 		}
 	}
 
