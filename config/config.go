@@ -20,8 +20,9 @@ type WebConfig struct {
 }
 
 type DoorConfig struct {
-	Pins              PinsConfig
-	MaxMotorRuntimeMs int
+	Pins           PinsConfig
+	LatchMoveTime  int
+	LockingTimeout int
 }
 
 type PinsConfig struct {
@@ -57,7 +58,7 @@ var defaultCfg = Config{
 			SenseUnlocked: 25,
 			SenseDoor:     8,
 		},
-		MaxMotorRuntimeMs: 320, // in ms
+		LatchMoveTime: 70, // in ms
 	},
 	Buttons: ButtonsConfig{
 		// GPIOs for the big red and green buttons

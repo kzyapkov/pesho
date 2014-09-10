@@ -10,24 +10,38 @@ import (
 	"github.com/kzyapkov/pesho/door"
 )
 
-type PeshoWeb struct {
-	door door.Door
-}
-
 func setHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Server", "pesho/0.1")
 }
 
-func (p *PeshoWeb) handleOpen(w http.ResponseWriter, r *http.Request) {
-
+type response struct {
+	State door.State `json:"state"`
+	Error error      `json:"error,omitempty"`
 }
 
-func (p *PeshoWeb) handleClose(w http.ResponseWriter, r *http.Request) {
-
+func (r *response) WriteTo(w http.ResponseWriter) {
+	d, _ := json.Marshal(r)
+	w.Write(d)
 }
 
-func (p *PeshoWeb) handleStatus(w http.ResponseWriter, r *http.Request) {
+func (p *pesho) handleLock(w http.ResponseWriter, r *http.Request) {
+	setHeaders(w)
+	var resp response
+	resp.Error = p.door.Lock()
+	resp.State = p.door.State()
+	resp.WriteTo(w)
+}
+
+func (p *pesho) handleUnlock(w http.ResponseWriter, r *http.Request) {
+	setHeaders(w)
+	var resp response
+	resp.Error = p.door.Unlock()
+	resp.State = p.door.State()
+	resp.WriteTo(w)
+}
+
+func (p *pesho) handleStatus(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	data, err := json.MarshalIndent(p.door.State(), "", "    ")
 	if err != nil {
@@ -38,16 +52,27 @@ func (p *PeshoWeb) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func ServeForever(d door.Door, cfg config.WebConfig) {
-	p := &PeshoWeb{door: d}
+func (p *pesho) httpServer(cfg config.WebConfig) {
+	defer p.workers.Done()
+
 	http.Handle("/status", restrictMethod(http.HandlerFunc(p.handleStatus), "GET"))
-	err := http.ListenAndServe(cfg.Listen, nil)
-	if err != nil {
-		log.Panicf("web: %v", err)
+	http.Handle("/lock", restrictMethod(http.HandlerFunc(p.handleLock), "POST"))
+	http.Handle("/unlock", restrictMethod(http.HandlerFunc(p.handleUnlock), "POST"))
+
+	var err error
+	// fix this to be a real server with control over the listener
+	if cfg.Listen != "" {
+		go func() {
+			if err = http.ListenAndServe(cfg.Listen, nil); err != nil {
+				log.Fatalf("web: %v", err)
+			}
+		}()
 	}
 	if cfg.TLS != nil {
 		log.Print("TLS not yet implemented")
 	}
+
+	<-p.dying
 }
 
 func restrictMethod(h http.Handler, methods ...string) http.Handler {
@@ -64,6 +89,5 @@ func restrictMethod(h http.Handler, methods ...string) http.Handler {
 			return
 		}
 		h.ServeHTTP(w, r)
-		return
 	})
 }

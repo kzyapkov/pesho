@@ -5,6 +5,7 @@ package door
 import (
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,34 +19,23 @@ var (
 	ErrNotDone       = errors.New("the requested door operation was not completed")
 )
 
+// A door object
+type Door interface {
+	State() State                                // The current state of the door
+	Lock() error                                 // Lock, blocks for outcome
+	Unlock() error                               // Unlock, blocks for outcome
+	Close() error                                // Cleanup resources
+	Subscribe(chan *DoorEvent) <-chan *DoorEvent // Notifies all for each new state
+	Unsubscribe(<-chan *DoorEvent) error         // Channel will get no more notifications of events
+}
+
 type State struct {
-	Latch LatchState
-	Door  DoorState
+	Latch LatchState `json:"latch"`
+	Door  DoorState  `json:"door"`
 }
 
 func (s *State) String() string {
-	var door, latch string
-	switch s.Door {
-	case Open:
-		door = "Open"
-	case Closed:
-		door = "Closed"
-	}
-	switch s.Latch {
-	case Locked:
-		latch = "Locked"
-	case Unlocked:
-		latch = "Unlocked"
-	case Locking:
-		latch = "Locking"
-	case Unlocking:
-		latch = "Unlocking"
-	case Unknown:
-		latch = "Unknown"
-	default:
-		latch = "**FIXME**"
-	}
-	return "State{Door: " + door + ", Latch: " + latch + "}"
+	return "State{Door: " + s.Door.String() + ", Latch: " + s.Latch.String() + "}"
 }
 
 func (s *State) IsOpen() bool {
@@ -80,6 +70,27 @@ const (
 	Unknown
 )
 
+func (l LatchState) String() string {
+	switch l {
+	case Locked:
+		return "Locked"
+	case Unlocked:
+		return "Unlocked"
+	case Locking:
+		return "Locking"
+	case Unlocking:
+		return "Unlocking"
+	case Unknown:
+		return "Unknown"
+	default:
+		return "**FIXME**"
+	}
+}
+
+func (l LatchState) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + strings.ToLower(l.String()) + `"`), nil
+}
+
 type DoorState int
 
 const (
@@ -87,19 +98,24 @@ const (
 	Closed
 )
 
+func (d DoorState) String() string {
+	switch d {
+	case Closed:
+		return "Closed"
+	case Open:
+		return "Open"
+	default:
+		return "**FIXME**"
+	}
+}
+
+func (d DoorState) MarshalJSON() ([]byte, error) {
+	return []byte((`"` + strings.ToLower(d.String()) + `"`)), nil
+}
+
 type DoorEvent struct {
 	Old, New State
 	When     time.Time
-}
-
-// A door object
-type Door interface {
-	State() State                                // The current state of the door
-	Lock() error                                 // Lock, blocks for outcome
-	Unlock() error                               // Unlock, blocks for outcome
-	Close() error                                // Cleanup resources
-	Subscribe(chan *DoorEvent) <-chan *DoorEvent // Notifies all for each new state
-	Unsubscribe(<-chan *DoorEvent) error         // Channel will get no more notifications of events
 }
 
 type door struct {
@@ -129,7 +145,7 @@ func (d *door) Lock() error {
 		return nil // All good, we're locked
 	}
 	if state.Latch != Locking {
-		log.Printf(" *** THIS IS BAD *** while locking, state=(%#v) but no error?", state)
+		log.Printf("while locking, state=(%#v) but no error?", state)
 		return ErrInternal
 	}
 	updates := d.Subscribe(nil)
@@ -252,19 +268,21 @@ func (d *door) Unsubscribe(c <-chan *DoorEvent) error {
 	}
 	return ErrNotSubscribed
 }
+
 func (d *door) Close() error {
 	return nil
 }
+
 func NewFromConfig(cfg config.DoorConfig) (Door, error) {
 	d := &door{
 		subsMutex: &sync.Mutex{},
 	}
 	d.state.State = &State{}
 	d.state.Mutex = &sync.Mutex{}
-	m, err := wireUp(
+	m, err := newController(
 		cfg.Pins.SenseLocked, cfg.Pins.SenseUnlocked, cfg.Pins.SenseDoor,
 		cfg.Pins.LatchEnable, cfg.Pins.LatchLock, cfg.Pins.LatchUnlock,
-		cfg.MaxMotorRuntimeMs, d.notify,
+		cfg.LatchMoveTime, d.notify,
 	)
 	if err != nil {
 		return nil, err

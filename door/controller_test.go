@@ -7,8 +7,8 @@ import (
 	"github.com/kzyapkov/gpio/test"
 )
 
-func getTestWires() *wires {
-	w := &wires{
+func getTestController() *controller {
+	w := &controller{
 		sensors: &sensors{
 			locked:   &test.PinMock{},
 			unlocked: &test.PinMock{},
@@ -27,15 +27,7 @@ func getTestWires() *wires {
 	return w
 }
 
-func initWires(w *wires, locked bool) {
-	w.locked.(*test.PinMock).TheValue = false
-	w.unlocked.(*test.PinMock).TheValue = false
-	w.door.(*test.PinMock).TheValue = false
-
-	w.reset()
-}
-
-func stateMonitor(w *wires) *State {
+func stateMonitor(w *controller) *State {
 	var state State
 	w.setDelegate(func(s State) {
 		state = s
@@ -45,7 +37,7 @@ func stateMonitor(w *wires) *State {
 
 func TestGettingTestWires(t *testing.T) {
 	var m doorAutomata
-	m = getTestWires()
+	m = getTestController()
 	m.setDelegate(func(s State) {})
 }
 
@@ -57,19 +49,19 @@ func TestSensorsReadDoor(t *testing.T) {
 	}
 
 	c.door.(*test.PinMock).TheValue = true
-	isClosed := c.readDoor()
+	isClosed := c.isClosed()
 	if isClosed != true {
-		t.Fail()
+		t.Fatal("door should be closed")
 	}
 	state := &State{}
 	c.updateDoorState(state)
 	if state.Door != Closed {
-		t.Fail()
+		t.Fatal("door should be closed")
 	}
 }
 
 func TestInitialLatchStates(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 	m.sensors.locked.(*test.PinMock).TheValue = true
 	m.sensors.unlocked.(*test.PinMock).TheValue = false
 	state := stateMonitor(m)
@@ -90,7 +82,7 @@ func TestInitialLatchStates(t *testing.T) {
 }
 
 func TestInitialStateInvalid(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 	m.locked.(*test.PinMock).TheValue = false
 	m.unlocked.(*test.PinMock).TheValue = false
 	m.door.(*test.PinMock).TheValue = false
@@ -107,7 +99,7 @@ func TestInitialStateInvalid(t *testing.T) {
 }
 
 func TestInitialDoorStates(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 	m.door.(*test.PinMock).TheValue = false
 	state := stateMonitor(m)
 	m.reset()
@@ -122,7 +114,7 @@ func TestInitialDoorStates(t *testing.T) {
 }
 
 func TestHandleLocked(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 
 	// straight-forward case, locked triggered while locking
 	m.sensors.locked.(*test.PinMock).TheValue = false
@@ -131,7 +123,9 @@ func TestHandleLocked(t *testing.T) {
 	state := stateMonitor(m)
 	m.reset()
 	m.state.Latch = Locking
-	m.handleSenseLocked()
+	m.sensors.locked.(*test.PinMock).TheValue = true
+	m.sensors.unlocked.(*test.PinMock).TheValue = false
+	m.onLocked()
 	if state.Latch != Locked {
 		t.Errorf("want state.Latch=(%v), have (%v)", Locked, state.Latch)
 	}
@@ -145,7 +139,7 @@ func TestHandleLocked(t *testing.T) {
 }
 
 func TestHandleUnlocked(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 
 	// straight-forward case, locked triggered while locking
 	m.sensors.locked.(*test.PinMock).TheValue = true
@@ -154,33 +148,34 @@ func TestHandleUnlocked(t *testing.T) {
 	state := stateMonitor(m)
 	m.reset()
 	m.state.Latch = Unlocking
-	m.handleSenseUnlocked()
+	m.sensors.locked.(*test.PinMock).TheValue = false
+	m.sensors.unlocked.(*test.PinMock).TheValue = true
+	m.onUnlocked()
 	if state.Latch != Unlocked {
 		t.Errorf("want state.Latch=(%v), have (%v)", Unlocked, state.Latch)
 	}
-
 }
 
 func TestHandleDoor(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 	state := stateMonitor(m)
 	m.reset()
 
 	m.sensors.door.(*test.PinMock).TheValue = false
-	m.handleSenseDoor()
+	m.onDoorChange()
 	if m.state.Door != Open {
 		t.Errorf("want state.Door=(%v), have (%v)", Closed, state.Door)
 	}
 
 	m.sensors.door.(*test.PinMock).TheValue = true
-	m.handleSenseDoor()
+	m.onDoorChange()
 	if m.state.Door != Closed {
 		t.Errorf("want state.Door=(%v), have (%v)", Open, state.Door)
 	}
 }
 
 func TestRequestLock(t *testing.T) {
-	m := getTestWires()
+	m := getTestController()
 	// state := stateMonitor(m)
 	m.reset()
 
