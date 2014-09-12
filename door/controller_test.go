@@ -48,11 +48,7 @@ func TestSensorsReadDoor(t *testing.T) {
 		&test.PinMock{},
 	}
 
-	c.door.(*test.PinMock).TheValue = true
-	isClosed := c.isClosed()
-	if isClosed != true {
-		t.Fatal("door should be closed")
-	}
+	c.door.(*test.PinMock).TheValue = false
 	state := &State{}
 	c.updateDoorState(state)
 	if state.Door != Closed {
@@ -62,8 +58,8 @@ func TestSensorsReadDoor(t *testing.T) {
 
 func TestInitialLatchStates(t *testing.T) {
 	m := getTestController()
-	m.sensors.locked.(*test.PinMock).TheValue = true
-	m.sensors.unlocked.(*test.PinMock).TheValue = false
+	m.sensors.locked.(*test.PinMock).TheValue = false
+	m.sensors.unlocked.(*test.PinMock).TheValue = true
 	state := stateMonitor(m)
 
 	m.reset()
@@ -71,8 +67,8 @@ func TestInitialLatchStates(t *testing.T) {
 		t.Errorf("want state.Latch=(%v), have (%v)", Locked, state.Latch)
 	}
 
-	m.sensors.locked.(*test.PinMock).TheValue = false
-	m.sensors.unlocked.(*test.PinMock).TheValue = true
+	m.sensors.locked.(*test.PinMock).TheValue = true
+	m.sensors.unlocked.(*test.PinMock).TheValue = false
 
 	m.reset()
 	if state.Latch != Unlocked {
@@ -85,7 +81,7 @@ func TestInitialStateInvalid(t *testing.T) {
 	m := getTestController()
 	m.locked.(*test.PinMock).TheValue = false
 	m.unlocked.(*test.PinMock).TheValue = false
-	m.door.(*test.PinMock).TheValue = false
+	m.door.(*test.PinMock).TheValue = true
 	state := stateMonitor(m)
 
 	m.reset()
@@ -100,13 +96,13 @@ func TestInitialStateInvalid(t *testing.T) {
 
 func TestInitialDoorStates(t *testing.T) {
 	m := getTestController()
-	m.door.(*test.PinMock).TheValue = false
+	m.door.(*test.PinMock).TheValue = true
 	state := stateMonitor(m)
 	m.reset()
 	if state.Door != Open {
 		t.Fail()
 	}
-	m.door.(*test.PinMock).TheValue = true
+	m.door.(*test.PinMock).TheValue = false
 	m.reset()
 	if state.Door != Closed {
 		t.Fail()
@@ -161,16 +157,16 @@ func TestHandleDoor(t *testing.T) {
 	state := stateMonitor(m)
 	m.reset()
 
-	m.sensors.door.(*test.PinMock).TheValue = false
-	m.onDoorChange()
-	if m.state.Door != Open {
-		t.Errorf("want state.Door=(%v), have (%v)", Closed, state.Door)
-	}
-
 	m.sensors.door.(*test.PinMock).TheValue = true
 	m.onDoorChange()
-	if m.state.Door != Closed {
+	if m.state.Door != Open {
 		t.Errorf("want state.Door=(%v), have (%v)", Open, state.Door)
+	}
+
+	m.sensors.door.(*test.PinMock).TheValue = false
+	m.onDoorChange()
+	if m.state.Door != Closed {
+		t.Errorf("want state.Door=(%v), have (%v)", Closed, state.Door)
 	}
 }
 
