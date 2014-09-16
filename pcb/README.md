@@ -1,4 +1,4 @@
-# Pesho
+# Pesho PCB
 
 ### Hardware description:
 
@@ -14,6 +14,7 @@ All modules, that weren't available are in pesho.pretty folder.
 
 ### License: [Beerware][1]
 
+```
 /*
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
@@ -22,5 +23,6 @@ All modules, that weren't available are in pesho.pretty folder.
  * this stuff is worth it, you can buy me a beer in return Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  */
+```
 
 [1]: http://en.wikipedia.org/wiki/Beerware
