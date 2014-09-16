@@ -1,0 +1,409 @@
+Cmp-Mod V01 Created by Cvpcb (2014-08-29 BZR 5105)-product   date = Tue 16 Sep 2014 01:15:25 PM EEST
+
+BeginCmp
+TimeStamp = /5419B6A4;
+Reference = C1;
+ValeurCmp = CE 220uF 50V 105C Fujicon;
+IdModule  = capacitors:CP_10x13mm;
+EndCmp
+
+BeginCmp
+TimeStamp = /541A1BE7;
+Reference = C2;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /541A1DC0;
+Reference = C3;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /541A1E22;
+Reference = C4;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54171925;
+Reference = C5;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /5417198B;
+Reference = C6;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /541719E4;
+Reference = C7;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54174F14;
+Reference = C8;
+ValeurCmp = 10uF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54170A8D;
+Reference = C9;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54170B21;
+Reference = C10;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54170B75;
+Reference = C11;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54174ECE;
+Reference = C12;
+ValeurCmp = 100nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /541A29E3;
+Reference = C13;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54174E6B;
+Reference = C14;
+ValeurCmp = 100pF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /541A2AA1;
+Reference = C15;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /541A2AF8;
+Reference = C16;
+ValeurCmp = 10nF;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /5416034F;
+Reference = D1;
+ValeurCmp = LOCK;
+IdModule  = led:LED-5MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /5416050E;
+Reference = D2;
+ValeurCmp = EN;
+IdModule  = led:LED-5MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /54160543;
+Reference = D3;
+ValeurCmp = UNLOCK;
+IdModule  = led:LED-5MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /54173C74;
+Reference = D4;
+ValeurCmp = BUK;
+IdModule  = led:LED-5MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /54173BDE;
+Reference = D5;
+ValeurCmp = BD;
+IdModule  = led:LED-5MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /54173522;
+Reference = D6;
+ValeurCmp = BLK;
+IdModule  = led:LED-5MM;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415F970;
+Reference = D7;
+ValeurCmp = SB560 YJ / 60V / 5A / Schottky;
+IdModule  = discret:D3;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415FBDC;
+Reference = D8;
+ValeurCmp = SB560 YJ / 60V / 5A / Schottky;
+IdModule  = discret:D3;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415FC05;
+Reference = D9;
+ValeurCmp = SB560 YJ / 60V / 5A / Schottky;
+IdModule  = discret:D3;
+EndCmp
+
+BeginCmp
+TimeStamp = /5418241B;
+Reference = D10;
+ValeurCmp = SB560 YJ / 60V / 5A / Schottky;
+IdModule  = discret:D6.5;
+EndCmp
+
+BeginCmp
+TimeStamp = /54182764;
+Reference = D11;
+ValeurCmp = SB560 YJ / 60V / 5A / Schottky;
+IdModule  = discret:D6.5;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415ED8F;
+Reference = IC1;
+ValeurCmp = 4N25;
+IdModule  = dip_sockets:DIP-6__300_ELL;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415EF0E;
+Reference = IC2;
+ValeurCmp = 4N25;
+IdModule  = dip_sockets:DIP-6__300_ELL;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415EF39;
+Reference = IC3;
+ValeurCmp = 4N25;
+IdModule  = dip_sockets:DIP-6__300_ELL;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415EFF6;
+Reference = IC4;
+ValeurCmp = 4N25;
+IdModule  = dip_sockets:DIP-6__300_ELL;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415EFBE;
+Reference = IC5;
+ValeurCmp = 4N25;
+IdModule  = dip_sockets:DIP-6__300_ELL;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415EF86;
+Reference = IC6;
+ValeurCmp = 4N25;
+IdModule  = dip_sockets:DIP-6__300_ELL;
+EndCmp
+
+BeginCmp
+TimeStamp = /5417A5FC;
+Reference = JP1;
+ValeurCmp = JUMPER;
+IdModule  = pin_array:PIN_ARRAY_3X1;
+EndCmp
+
+BeginCmp
+TimeStamp = /5417A5A9;
+Reference = JP2;
+ValeurCmp = JUMPER;
+IdModule  = pin_array:PIN_ARRAY_3X1;
+EndCmp
+
+BeginCmp
+TimeStamp = /541762B3;
+Reference = JP3;
+ValeurCmp = JUMPER;
+IdModule  = pin_array:PIN_ARRAY_3X1;
+EndCmp
+
+BeginCmp
+TimeStamp = /5416D0B3;
+Reference = P1;
+ValeurCmp = Power;
+IdModule  = pesho:HD-515R-2P;
+EndCmp
+
+BeginCmp
+TimeStamp = /54161DCC;
+Reference = P2;
+ValeurCmp = Bulkey;
+IdModule  = pesho:HD-515R-6P;
+EndCmp
+
+BeginCmp
+TimeStamp = /5416E298;
+Reference = P3;
+ValeurCmp = Raspberry Pi CONN;
+IdModule  = connect:HE10_26D;
+EndCmp
+
+BeginCmp
+TimeStamp = /5419948E;
+Reference = P4;
+ValeurCmp = Serial;
+IdModule  = connect:SIL-3;
+EndCmp
+
+BeginCmp
+TimeStamp = /54160E6C;
+Reference = R1;
+ValeurCmp = 2.7K;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54160E2A;
+Reference = R2;
+ValeurCmp = 2.7K;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54160DC2;
+Reference = R3;
+ValeurCmp = 2.7K;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415F383;
+Reference = R4;
+ValeurCmp = 820;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415F7C1;
+Reference = R5;
+ValeurCmp = 820;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /5415F7F5;
+Reference = R6;
+ValeurCmp = 820;
+IdModule  = smd_capacitors:c_1206;
+EndCmp
+
+BeginCmp
+TimeStamp = /54161A90;
+Reference = RV1;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /54161CFF;
+Reference = RV2;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /54161D40;
+Reference = RV3;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /541697BD;
+Reference = RV4;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /54169973;
+Reference = RV5;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /54166115;
+Reference = RV6;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /541664ED;
+Reference = RV7;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /54166535;
+Reference = RV8;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /541699BA;
+Reference = RV9;
+ValeurCmp = 3296W(64W) 20K DIV;
+IdModule  = pesho:3968W;
+EndCmp
+
+BeginCmp
+TimeStamp = /541775FC;
+Reference = U1;
+ValeurCmp = JE-112D;
+IdModule  = pesho:JE-112D;
+EndCmp
+
+BeginCmp
+TimeStamp = /5417774F;
+Reference = U2;
+ValeurCmp = JE-112D;
+IdModule  = pesho:JE-112D;
+EndCmp
+
+BeginCmp
+TimeStamp = /541788C8;
+Reference = U3;
+ValeurCmp = JE-112D;
+IdModule  = pesho:JE-112D;
+EndCmp
+
+EndListe
