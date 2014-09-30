@@ -1,4 +1,4 @@
-Cmp-Mod V01 Created by Cvpcb (2014-08-29 BZR 5105)-product   date = Tue 16 Sep 2014 01:15:25 PM EEST
+Cmp-Mod V01 Created by Cvpcb (2014-09-18 BZR 5141)-product   date = Tue 30 Sep 2014 11:42:03 PM EEST
 
 BeginCmp
 TimeStamp = /5419B6A4;
@@ -187,6 +187,20 @@ TimeStamp = /54182764;
 Reference = D11;
 ValeurCmp = SB560 YJ / 60V / 5A / Schottky;
 IdModule  = discret:D6.5;
+EndCmp
+
+BeginCmp
+TimeStamp = /542B0EC2;
+Reference = D12;
+ValeurCmp = UF5GC SMD;
+IdModule  = pesho:DO-214AB;
+EndCmp
+
+BeginCmp
+TimeStamp = /542B395E;
+Reference = D13;
+ValeurCmp = UF5GC SMD;
+IdModule  = pesho:DO-214AB;
 EndCmp
 
 BeginCmp
