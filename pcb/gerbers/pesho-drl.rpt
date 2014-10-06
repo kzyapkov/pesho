@@ -1,0 +1,17 @@
+Drill report for /home/radoslavb/Home/git/pesho/pcb/pesho.kicad_pcb
+Created on Mon 06 Oct 2014 10:40:55 AM CEST
+Drill report for plated through holes :
+T1  0.60mm  0.024"  (9 holes)
+T2  0.80mm  0.031"  (86 holes)
+T3  1.00mm  0.039"  (281 holes)
+T4  1.50mm  0.059"  (21 holes)
+T5  3.00mm  0.118"  (4 holes)
+
+Total plated holes count 401
+
+
+Drill report for unplated through holes :
+
+Total unplated holes count 0
+
+
