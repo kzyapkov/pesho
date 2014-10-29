@@ -125,7 +125,7 @@ F 3 "" H 7650 6900 30  0000 C CNN
 	1    7650 6900
 	0    1    1    0   
 $EndComp
-Text Notes 7400 6650 0    60   ~ 0
+Text Notes 8050 6700 0    60   ~ 0
 3.3V / 5 mA
 $Comp
 L GNDA #PWR01
@@ -1839,4 +1839,38 @@ F 3 "http://store.comet.bg/download-file.php?id=5587" H 2400 1250 60  0001 C CNN
 	1    2400 1250
 	1    0    0    -1  
 $EndComp
+Text Notes 12900 6600 0    60   ~ 0
+DO NOT MOUNT\nD10 and D11
+Wire Notes Line
+	12900 7150 12400 7150
+Text Notes 12850 7100 0    60   ~ 0
+SHOULD BE LEFT OPEN
+Text Notes 9900 6800 0    60   ~ 0
+SHORTED
+Text Notes 9950 7300 0    60   ~ 0
+SHORTED
+Text Notes 9950 8150 0    60   ~ 0
+SHORTED
+Wire Notes Line
+	9850 6650 9600 6650
+Wire Notes Line
+	9600 6650 9600 6800
+Wire Notes Line
+	9850 7150 9600 7150
+Wire Notes Line
+	9600 7150 9600 7350
+Wire Notes Line
+	9850 7650 9600 7650
+Wire Notes Line
+	9600 7650 9600 7850
+Text Notes 10750 6050 0    60   ~ 0
+LAYOUT OF THE RELAYS IS FLIPPED !
+Text Notes 7350 7150 0    60   ~ 0
+2 x 47 Ohms\nIN PARALLEL
+Text Notes 7350 7650 0    60   ~ 0
+2 x 47 Ohms\nIN PARALLEL
+Text Notes 7300 8150 0    60   ~ 0
+2 x 47 Ohms\nIN PARALLEL
+Text Notes 6950 6700 0    60   ~ 0
+RESISTORS CHANGED
 $EndSCHEMATC
