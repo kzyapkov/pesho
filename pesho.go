@@ -27,9 +27,18 @@ type pesho struct {
 	workers   sync.WaitGroup
 }
 
+func (p *pesho) goWorker(f func()) {
+	p.workers.Add(1)
+	go func() {
+		defer p.workers.Done()
+		f()
+	}()
+}
+
 func (p *pesho) interruptHandler() {
 	notifier := make(chan os.Signal)
 	signal.Notify(notifier, os.Interrupt, syscall.SIGTERM)
+	log.Print("Installed SIGINT/SIGTERM")
 	<-notifier
 
 	log.Print("Received SIGINT/SIGTERM; Exiting gracefully...")
@@ -71,24 +80,23 @@ func maybeSubcommand() {
 }
 
 func (p *pesho) stateMonitor() {
-	defer p.workers.Done()
-
-	doorEvents := p.door.Subscribe(nil)
-	defer p.door.Unsubscribe(doorEvents)
+	events := p.door.Subscribe(nil)
+	defer p.door.Unsubscribe(events)
+	log.Print("Reporting door events.")
 	for {
 		select {
 		case <-p.dying:
 			return
-		case evt := <-doorEvents:
+		case evt := <-events:
 			log.Printf("Now %s, was %s at %s\n", evt.New.String(), evt.Old.String(), evt.When)
 		}
 	}
 }
 
 func (p *pesho) hangupHandler() {
-	defer p.workers.Done()
 	toggle := make(chan os.Signal)
 	signal.Notify(toggle, syscall.SIGHUP)
+	log.Print("Installed HUP handler")
 	for {
 		select {
 		case <-p.dying:
@@ -97,20 +105,16 @@ func (p *pesho) hangupHandler() {
 			state := p.door.State()
 			log.Printf("SIGHUP: %v", state)
 			if state.IsLocked() {
-				log.Print("Trying Unlock...")
 				go func() {
+					log.Print("Trying Unlock...")
 					var err = p.door.Unlock()
-					if err != nil {
-						log.Printf("Unlock: %v", err)
-					}
+					log.Printf("Unlock: %v", err)
 				}()
 			} else {
-				log.Print("Trying Lock...")
 				go func() {
+					log.Print("Trying Lock...")
 					var err = p.door.Lock()
-					if err != nil {
-						log.Printf("Lock: %v", err)
-					}
+					log.Printf("Lock: %v", err)
 				}()
 			}
 		}
@@ -118,7 +122,7 @@ func (p *pesho) hangupHandler() {
 }
 
 func (p *pesho) buttonHandler(btns *buttons) {
-	defer p.workers.Done()
+	var err error
 	for {
 		select {
 		case <-p.dying:
@@ -126,10 +130,16 @@ func (p *pesho) buttonHandler(btns *buttons) {
 		case b := <-btns.Presses:
 			if b == RedButton {
 				log.Print("Red button pressed, locking")
-				p.door.Lock()
+				err = p.door.Lock()
+				if err != nil {
+					log.Printf("Lock: %#v", err)
+				}
 			} else {
 				log.Print("Green button pressed, locking")
-				p.door.Unlock()
+				err = p.door.Unlock()
+				if err != nil {
+					log.Printf("Unlock: %#v", err)
+				}
 			}
 		}
 	}
@@ -157,6 +167,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not init button GPIOs: %v", err)
 	}
+	log.Printf("The door: %#v", d)
 	p := &pesho{
 		door:      d,
 		closeOnce: &sync.Once{},
@@ -164,18 +175,18 @@ func main() {
 	}
 
 	go p.interruptHandler()
+	p.goWorker(p.stateMonitor)
 
-	p.workers.Add(1)
+	// the web interface, can't terminate yet, spanws own goroutines
+	p.installHttp()
 	go p.httpServer(cfg.Web)
-
-	p.workers.Add(1)
-	go p.stateMonitor()
-
-	p.workers.Add(1)
-	go p.hangupHandler()
-
-	p.workers.Add(1)
-	go p.buttonHandler(b)
+	// lock/unlock with kill -HUP
+	p.goWorker(p.hangupHandler)
+	p.goWorker(func() {
+		log.Print("starting button handler")
+		p.buttonHandler(b)
+	})
 
 	p.workers.Wait()
+
 }

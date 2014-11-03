@@ -52,13 +52,13 @@ func (p *pesho) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func (p *pesho) httpServer(cfg config.WebConfig) {
-	defer p.workers.Done()
-
+func (p *pesho) installHttp() {
 	http.Handle("/status", restrictMethod(http.HandlerFunc(p.handleStatus), "GET"))
 	http.Handle("/lock", restrictMethod(http.HandlerFunc(p.handleLock), "POST"))
 	http.Handle("/unlock", restrictMethod(http.HandlerFunc(p.handleUnlock), "POST"))
+}
 
+func (p *pesho) httpServer(cfg config.WebConfig) {
 	var err error
 	// fix this to be a real server with control over the listener
 	if cfg.Listen != "" {
