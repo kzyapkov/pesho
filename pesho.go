@@ -21,24 +21,15 @@ import (
 var configPath = flag.String("config", "/etc/pesho/config.json", "Configuration file")
 
 type pesho struct {
-	door      door.Door
-	closeOnce *sync.Once
-	dying     chan struct{}
-	workers   sync.WaitGroup
-}
-
-func (p *pesho) goWorker(f func()) {
-	p.workers.Add(1)
-	go func() {
-		defer p.workers.Done()
-		f()
-	}()
+	door      *door.Door     // hardware interface
+	closeOnce *sync.Once     // synchronizes shutdown
+	dying     chan struct{}  // die signal
+	workers   sync.WaitGroup // the "threads"
 }
 
 func (p *pesho) interruptHandler() {
 	notifier := make(chan os.Signal)
 	signal.Notify(notifier, os.Interrupt, syscall.SIGTERM)
-	log.Print("Installed SIGINT/SIGTERM")
 	<-notifier
 
 	log.Print("Received SIGINT/SIGTERM; Exiting gracefully...")
@@ -80,23 +71,24 @@ func maybeSubcommand() {
 }
 
 func (p *pesho) stateMonitor() {
-	events := p.door.Subscribe(nil)
-	defer p.door.Unsubscribe(events)
-	log.Print("Reporting door events.")
+	defer p.workers.Done()
+
+	doorEvents := p.door.Subscribe(nil)
+	defer p.door.Unsubscribe(doorEvents)
 	for {
 		select {
 		case <-p.dying:
 			return
-		case evt := <-events:
+		case evt := <-doorEvents:
 			log.Printf("Now %s, was %s at %s\n", evt.New.String(), evt.Old.String(), evt.When)
 		}
 	}
 }
 
 func (p *pesho) hangupHandler() {
+	defer p.workers.Done()
 	toggle := make(chan os.Signal)
 	signal.Notify(toggle, syscall.SIGHUP)
-	log.Print("Installed HUP handler")
 	for {
 		select {
 		case <-p.dying:
@@ -105,16 +97,20 @@ func (p *pesho) hangupHandler() {
 			state := p.door.State()
 			log.Printf("SIGHUP: %v", state)
 			if state.IsLocked() {
+				log.Print("SIGHUP: Trying Unlock...")
 				go func() {
-					log.Print("Trying Unlock...")
 					var err = p.door.Unlock()
-					log.Printf("Unlock: %v", err)
+					if err != nil {
+						log.Printf("SIGHUP: Unlock: %v", err)
+					}
 				}()
 			} else {
+				log.Print("SIGHUP: Trying Lock...")
 				go func() {
-					log.Print("Trying Lock...")
 					var err = p.door.Lock()
-					log.Printf("Lock: %v", err)
+					if err != nil {
+						log.Printf("Lock: %v", err)
+					}
 				}()
 			}
 		}
@@ -122,7 +118,7 @@ func (p *pesho) hangupHandler() {
 }
 
 func (p *pesho) buttonHandler(btns *buttons) {
-	var err error
+	defer p.workers.Done()
 	for {
 		select {
 		case <-p.dying:
@@ -130,16 +126,10 @@ func (p *pesho) buttonHandler(btns *buttons) {
 		case b := <-btns.Presses:
 			if b == RedButton {
 				log.Print("Red button pressed, locking")
-				err = p.door.Lock()
-				if err != nil {
-					log.Printf("Lock: %#v", err)
-				}
+				p.door.Lock()
 			} else {
 				log.Print("Green button pressed, locking")
-				err = p.door.Unlock()
-				if err != nil {
-					log.Printf("Unlock: %#v", err)
-				}
+				p.door.Unlock()
 			}
 		}
 	}
@@ -167,7 +157,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not init button GPIOs: %v", err)
 	}
-	log.Printf("The door: %#v", d)
 	p := &pesho{
 		door:      d,
 		closeOnce: &sync.Once{},
@@ -175,18 +164,18 @@ func main() {
 	}
 
 	go p.interruptHandler()
-	p.goWorker(p.stateMonitor)
 
-	// the web interface, can't terminate yet, spanws own goroutines
-	p.installHttp()
+	p.workers.Add(1)
 	go p.httpServer(cfg.Web)
-	// lock/unlock with kill -HUP
-	p.goWorker(p.hangupHandler)
-	p.goWorker(func() {
-		log.Print("starting button handler")
-		p.buttonHandler(b)
-	})
+
+	p.workers.Add(1)
+	go p.stateMonitor()
+
+	p.workers.Add(1)
+	go p.hangupHandler()
+
+	p.workers.Add(1)
+	go p.buttonHandler(b)
 
 	p.workers.Wait()
-
 }

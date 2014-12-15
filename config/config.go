@@ -50,23 +50,23 @@ var defaultCfg = Config{
 	Door: DoorConfig{
 		Pins: PinsConfig{
 			// output GPIOs
-			LatchEnable: 9,
-			LatchLock:   10,
-			LatchUnlock: 11,
+			LatchEnable: 26,
+			LatchLock:   13,
+			LatchUnlock: 19,
 			// input GPIOs
-			SenseLocked:   7,
-			SenseUnlocked: 25,
-			SenseDoor:     8,
+			SenseLocked:   16,
+			SenseUnlocked: 20,
+			SenseDoor:     21,
 		},
-		LatchMoveTime: 70, // in ms
+		LatchMoveTime: 150, // in ms
 	},
 	Buttons: ButtonsConfig{
 		// GPIOs for the big red and green buttons
-		Red:   0,
-		Green: 1,
+		Red:   2,
+		Green: 3,
 	},
 	Web: WebConfig{
-		Listen: ":82",
+		Listen: ":80",
 	},
 }
 

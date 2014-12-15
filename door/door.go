@@ -1,4 +1,4 @@
-// Package door implements the interface to an actual door lock and its
+// Package implements the interface to an actual door lock and its
 // associated sensors, controls and logic.
 package door
 
@@ -16,24 +16,37 @@ import (
 
 var (
 	ErrNotSubscribed = errors.New("not currently subscribed")
-	ErrInternal      = errors.New("Internal machinery error")
-	ErrNotDone       = errors.New("the requested door operation was not completed")
-	ErrDoorOpen      = errors.New("door is open")
+	ErrInterrupted   = errors.New("the requested door operation was interrupted")
+	ErrBusy          = errors.New("Pesho is busy doing something important")
 )
 
-//
-type Door interface {
-	State() State                                // The current state of the door
-	Lock() error                                 // Lock, blocks for outcome
-	Unlock() error                               // Unlock, blocks for outcome
-	Subscribe(chan *DoorEvent) <-chan *DoorEvent // Notifies all for each new state
-	Unsubscribe(<-chan *DoorEvent) error         // Channel will get no more notifications of events
-	Close() error                                // Cleanup resources
+type Door struct {
+	sensors  *sensors
+	controls *controls
+
+	state struct {
+		*State
+		*sync.Mutex
+	}
+
+	// to kill a current Lock/Unlock
+	killCurrent chan chan struct{}
+
+	subsMutex *sync.Mutex
+	subs      *sub
+	events    chan DoorEvent
+
+	// State() State                                // The current state of the door
+	// Lock() error                                 // Lock, blocks for outcome
+	// Unlock() error                               // Unlock, blocks for outcome
+	// Close() error                                // Cleanup resources
+	// Subscribe(chan *DoorEvent) <-chan *DoorEvent // Notifies all for each new state
+	// Unsubscribe(<-chan *DoorEvent) error         // Channel will get no more notifications of events
 }
 
 type State struct {
-	Latch LatchState `json:"latch"`
-	Door  DoorState  `json:"door"`
+	Latch LatchState `json:"latch"` // Position of the latch (or bolt): locked (extended), unlocked (retracted) or transitioning
+	Door  DoorState  `json:"door"`  // Reed switch readout
 }
 
 func (s *State) String() string {
@@ -50,7 +63,8 @@ func (s *State) IsLocked() bool {
 
 func (s *State) IsInFlight() bool {
 	switch s.Latch {
-	case Unlocking, Locking:
+	case Locking:
+	case Unlocking:
 		return true
 	default:
 	}
@@ -119,161 +133,80 @@ type DoorEvent struct {
 	When     time.Time
 }
 
-// GPIO inputs
-type sensors struct {
-	locked gpio.Pin
-	// unlocked gpio.Pin
-	door gpio.Pin
-}
-
-func (s *sensors) isLocked() {
-	return !s.locked.Get()
-}
-
-func (s *sensors) isClosed() {
-	return !s.door.Get()
-}
-
-// GPIO outputs
-type controls struct {
-	enable gpio.Pin
-	lock   gpio.Pin
-	unlock gpio.Pin
-}
-
-func (c *controls) startLocking() {
-	log.Print("startLocking")
-	c.lock.Set()
-	c.enable.Set()
-}
-
-func (c *controls) startUnlocking() {
-	log.Print("startUnlocking")
-	c.unlock.Set()
-	c.enable.Set()
-}
-
-func (c *controls) stopMotor() {
-	log.Print("stopMotor")
-	c.enable.Clear()
-	c.lock.Clear()
-	c.unlock.Clear()
-}
-
-type door struct {
-	state struct {
-		*State
-		*sync.Mutex
-	}
-
-	latchMoveTime time.Duration
-
-	in  *sensors
-	out *controls
-
-	quitCurrentJob chan struct{}
-
-	subsMutex *sync.Mutex
-	subs      *sub
-	events    chan DoorEvent
-
-	closing chan struct{}
-}
-
-func (d *door) State() State {
+func (d *Door) State() State {
 	d.state.Lock()
 	defer d.state.Unlock()
 	return *d.state.State
 }
 
-func (d *door) Lock() error {
+func (d *Door) Lock() error {
+	return d.moveLatch(Locked)
+}
+
+func (d *Door) Unlock() error {
+	return d.moveLatch(Unlocked)
+}
+
+func (d *Door) moveLatch(target LatchState) error {
 	d.state.Lock()
 	defer d.state.Unlock()
 
+	// Handle no-op cases
 	switch d.state.Latch {
-	case Locked:
+	case target:
+		// already there
 		return nil
+
 	case Locking:
-		break
 	case Unlocking:
-		close(d.quitCurrentJob)
-		fallthrough
-	case Unlocked:
-		if d.state.Door != Closed {
-			return ErrDoorOpen
-		}
-		d.quitCurrentJob = make(chan struct{})
-		go d.dolock()
-	default:
-		log.Printf("Lock: unknown state...")
+	case Unknown:
+		// TODO: maybe handle some of these better
+		return ErrBusy
 	}
 
-	updates := d.Subscribe(nil)
-	defer d.Unsubscribe(updates)
-	for {
-		select {
-		case new := <-updates:
-			if new.Latch == Locked {
-				return nil
-			}
-			if new.Latch != Locking {
-				return ErrNotDone
-			}
-		case <-time.After(1 * time.Second):
-			return ErrInternal
-		}
+	// We're in transit. Let others kill us via killCurrent
+	var inFlight LatchState
+	if target == Locked {
+		inFlight = Locking
+		d.controls.startLocking()
+	} else {
+		inFlight = Unlocking
+		d.controls.startUnlocking()
 	}
+	d.state.Latch = inFlight
+	d.killCurrent = make(chan chan struct{})
+	d.state.Unlock()
+
+	var ret error
+	select {
+	case <-time.After(200 * time.Millisecond):
+		d.controls.stopMotor()
+		d.state.Lock()
+		d.state.Latch = target
+		ret = nil
+	case killed := <-d.killCurrent:
+		d.controls.stopMotor()
+		d.state.Lock()
+		d.state.Latch = Unknown
+		if killed != nil {
+			close(killed)
+		}
+		ret = errors.New("locking was interrupted")
+	}
+	if d.killCurrent != nil {
+		close(d.killCurrent)
+		d.killCurrent = nil
+	}
+	return ret
 }
 
-func (d *door) Unlock() error {
-	d.state.Lock()
-	defer d.state.Unlock()
-
-	if d.state.Latch == Unlocked {
-		return nil
-	}
-
-	switch d.state.Latch {
-	case Unlocking:
-		break
-	case Locking:
-		d.out.stopMotor()
-		fallthrough
-	case Locked:
-		d.out.startLocking()
-		d.startMotorTimer()
-		d.scheduleStateUpdate()
-	default:
-		log.Printf("Unlock: unknown state...")
-	}
-
-	updates := d.Subscribe(nil)
-	defer d.Unsubscribe(updates)
-	for {
-		select {
-		case new := <-updates:
-			if new.Latch == Unlocked {
-				return nil
-			}
-			if new.Latch != Unlocking {
-				return ErrNotDone
-			}
-		case <-time.After(1 * time.Second):
-			return ErrInternal
-		}
-	}
-}
-
-func (d *door) notify(new State) {
+func (d *Door) notify(new State) {
 	// TODO: implement these notifications
 	//       with a single long-living goroutine and a channel
 	go func() {
 		d.state.Lock()
 		defer d.state.Unlock()
 		old := *d.state.State
-		if old.Same(&new) {
-			return
-		}
 		d.state.State = &new
 		var evt *DoorEvent = &DoorEvent{old, new, time.Now()}
 
@@ -296,7 +229,7 @@ type sub struct {
 	next *sub // linked list in door
 }
 
-func (d *door) Subscribe(c chan *DoorEvent) <-chan *DoorEvent {
+func (d *Door) Subscribe(c chan *DoorEvent) <-chan *DoorEvent {
 	if c == nil {
 		c = make(chan *DoorEvent, 3)
 	}
@@ -311,7 +244,7 @@ func (d *door) Subscribe(c chan *DoorEvent) <-chan *DoorEvent {
 	return c
 }
 
-func (d *door) Unsubscribe(c <-chan *DoorEvent) error {
+func (d *Door) Unsubscribe(c <-chan *DoorEvent) error {
 	var s, prev *sub
 	s = d.subs
 
@@ -337,12 +270,67 @@ func (d *door) Unsubscribe(c <-chan *DoorEvent) error {
 	return ErrNotSubscribed
 }
 
-func (d *door) Close() error {
-	return d.controller.close()
+func (d *Door) Close() error {
+	return nil
 }
 
-func NewFromConfig(cfg config.DoorConfig) (d *door, err error) {
+// GPIO inputs
+type sensors struct {
+	locked   gpio.Pin
+	unlocked gpio.Pin
+	door     gpio.Pin
+}
 
+// updateLatchState doesn't know about transitions
+func (s *sensors) updateLatchState(state *State) {
+	isLocked := !s.locked.Get()
+	isUnlocked := !s.unlocked.Get()
+	if isLocked == isUnlocked {
+		state.Latch = Unknown
+	} else {
+		if isLocked {
+			state.Latch = Locked
+		} else {
+			state.Latch = Unlocked
+		}
+	}
+}
+
+func (s *sensors) updateDoorState(state *State) {
+	isClosed := !s.door.Get()
+	if isClosed {
+		state.Door = Closed
+	} else {
+		state.Door = Open
+	}
+}
+
+// GPIO outputs
+type controls struct {
+	enable gpio.Pin
+	lock   gpio.Pin
+	unlock gpio.Pin
+}
+
+func (c *controls) startLocking() {
+	c.lock.Set()
+	c.enable.Set()
+}
+
+func (c *controls) startUnlocking() {
+	c.unlock.Set()
+	c.enable.Set()
+}
+
+func (c *controls) stopMotor() {
+	c.enable.Clear()
+	c.lock.Clear()
+	c.unlock.Clear()
+}
+
+func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
+
+	// can you do it right in less lines?
 	openPins := make([]gpio.Pin, 6)
 	var i int
 	var savedError error
@@ -371,26 +359,22 @@ func NewFromConfig(cfg config.DoorConfig) (d *door, err error) {
 		}
 	}()
 
-	d = &door{
-		latchMoveTime: time.Duration(cfg.LatchMoveTime) * time.Millisecond,
-		out: &controls{
+	d = &Door{
+		sensors: &sensors{
+			locked:   util.Debounced(mustPin(cfg.Pins.SenseLocked, gpio.ModeInput), 10*time.Millisecond),
+			unlocked: util.Debounced(mustPin(cfg.Pins.SenseUnlocked, gpio.ModeInput), 10*time.Millisecond),
+			door:     util.Debounced(mustPin(cfg.Pins.SenseDoor, gpio.ModeInput), 10*time.Millisecond),
+		},
+		controls: &controls{
 			enable: mustPin(cfg.Pins.LatchEnable, gpio.ModeLow),
 			lock:   mustPin(cfg.Pins.LatchLock, gpio.ModeLow),
 			unlock: mustPin(cfg.Pins.LatchUnlock, gpio.ModeLow),
 		},
-		in: &sensors{
-			locked: util.DebouncedInput(mustPin(cfg.Pins.SenseLocked), 10*time.Millisecond),
-			//			unlocked: util.DebouncedInput(mustPin(cfg.Pins.SenseUnlocked), 10*time.Millisecond),
-			door: util.DebouncedInput(mustPin(cfg.Pins.SenseDoor), 10*time.Millisecond),
-		},
 		subsMutex: &sync.Mutex{},
 	}
+
 	d.state.State = &State{}
 	d.state.Mutex = &sync.Mutex{}
 
-	if err != nil {
-		return nil, err
-	}
-	//	d.controller = m
 	return d, nil
 }
