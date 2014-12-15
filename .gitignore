@@ -2,3 +2,6 @@ _autosave-
 *.bak
 *.kicad_pcb-bak
 *.zip
+*.bck
+*.dcm
+
