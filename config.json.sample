@@ -1,22 +1,22 @@
 {
     "Door": {
         "Pins": {
-            "LatchEnable": 9,
-            "LatchLock": 10,
-            "LatchUnlock": 11,
-            "SenseLocked": 7,
-            "SenseUnlocked": 25,
-            "SenseDoor": 8
+            "LatchEnable": 26,
+            "LatchLock": 13,
+            "LatchUnlock": 19,
+            "SenseLocked": 16,
+            "SenseUnlocked": 20,
+            "SenseDoor": 21
         },
-        "LatchMoveTime": 70,
-        "LockingTimeout": 350
+        "LatchMoveTime": 150,
+        "LockingTimeout": 0
     },
     "Buttons": {
-        "Red": 0,
-        "Green": 1
+        "Red": 2,
+        "Green": 3
     },
     "Web": {
-        "Listen": ":82",
+        "Listen": ":80",
         "TLS": null
     }
 }

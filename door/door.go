@@ -154,12 +154,14 @@ func (d *Door) moveLatch(target LatchState) error {
 	// Handle no-op cases
 	switch d.state.Latch {
 	case target:
+		log.Printf("movelLatch: already %s", d.state.Latch.String())
 		// already there
 		return nil
 
 	case Locking:
 	case Unlocking:
 	case Unknown:
+		log.Printf("moveLatch: now busy with %s, ErrBusy-ing out", d.state.Latch.String())
 		// TODO: maybe handle some of these better
 		return ErrBusy
 	}
@@ -173,6 +175,7 @@ func (d *Door) moveLatch(target LatchState) error {
 		inFlight = Unlocking
 		d.controls.startUnlocking()
 	}
+	log.Printf("moveLatch: now %s", inFlight.String())
 	d.state.Latch = inFlight
 	d.killCurrent = make(chan chan struct{})
 	d.state.Unlock()
@@ -196,6 +199,11 @@ func (d *Door) moveLatch(target LatchState) error {
 	if d.killCurrent != nil {
 		close(d.killCurrent)
 		d.killCurrent = nil
+	}
+	if ret != nil {
+		log.Printf("moveLatch: error: %s", ret)
+	} else {
+		log.Printf("moveLatch: returning %s", ret)
 	}
 	return ret
 }
@@ -331,6 +339,7 @@ func (c *controls) stopMotor() {
 func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
 
 	// can you do it right in less lines?
+	// begin pin-opening boilerplate
 	openPins := make([]gpio.Pin, 6)
 	var i int
 	var savedError error
@@ -358,6 +367,7 @@ func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
 			}
 		}
 	}()
+	// end pin-opening boilerplate
 
 	d = &Door{
 		sensors: &sensors{

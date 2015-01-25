@@ -50,13 +50,18 @@ var defaultCfg = Config{
 	Door: DoorConfig{
 		Pins: PinsConfig{
 			// output GPIOs
+			// Latch* move the locking mechanism back and forth
+			// with an H-bridge driver
 			LatchEnable: 26,
 			LatchLock:   13,
 			LatchUnlock: 19,
+
 			// input GPIOs
+			// Locked and Unlocked are wired to the same SP-DT switch
 			SenseLocked:   16,
 			SenseUnlocked: 20,
-			SenseDoor:     21,
+			// Hall-effect sensor for the door
+			SenseDoor: 21,
 		},
 		LatchMoveTime: 150, // in ms
 	},
