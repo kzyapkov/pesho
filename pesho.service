@@ -1,0 +1,11 @@
+# pesho.service for systemd
+[Unit]
+Description=Pesho
+
+[Service]
+Type=simple
+ExecStart=/root/pesho -config=/root/pesho.conf
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
