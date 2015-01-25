@@ -62,8 +62,8 @@ var defaultCfg = Config{
 	},
 	Buttons: ButtonsConfig{
 		// GPIOs for the big red and green buttons
-		Red:   2,
-		Green: 3,
+		Red:   5,
+		Green: 12,
 	},
 	Web: WebConfig{
 		Listen: ":80",
