@@ -9,11 +9,13 @@ The rest of this page is in Bulgarian and should not be read by anyone.
 Схемата включва:
  * **RaspberryPi B+**  на което работи демона за управление, свързано
    през етернет кабел за кораба-майка;
- * **DC Dual Motor Driver 30V 4A** -- драйвер за мотора в бравата, [линк](http://www.microbot.it/en/product/73/DC-Dual-Motor-Driver-30V-4A-V2.html)
+ * **DC Dual Motor Driver 30V 4A** -- драйвер за мотора в бравата,
+     [линк](http://www.microbot.it/en/product/73/DC-Dual-Motor-Driver-30V-4A-V2.html)
  * **DC-DC Step-down** за да дадем 5V на малинката и
  * няколко оптрона и други пасивни компоненти.
 
-[Схемата](https://raw.githubusercontent.com/kzyapkov/pesho/master/hardware/pesho.pdf), начертана с KiCAD.
+[Схемата](https://raw.githubusercontent.com/kzyapkov/pesho/master/hardware/pesho.pdf),
+начертана с KiCAD.
 
 Накратко, Пешо чете 3 датчика на вратата:
  * "шиповете са извадени", на бравата BLK
@@ -30,7 +32,7 @@ The rest of this page is in Bulgarian and should not be read by anyone.
 
 ## Строене
 
-За успешен билд ти трябва Go Workspace, виж в Google. После трябва
+За успешен билд ти трябва Go Workspace, ето [как](https://golang.org/doc/code.html). После трябва
 да упоменеш, че крос-компилираш за arm6:
 
     # tell go we're cross-compiling for arm6 (rpi):
