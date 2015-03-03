@@ -50,6 +50,10 @@ The rest of this page is in Bulgarian and should not be read by anyone.
 така получения `pesho` е статично линкнатото bin-че което седи
 в /root/pesho и се пуска със `systemctl start pesho`.
 
+## Следва
+
+* Да следим захранването.
+* Да нотифицираме нещо за отворена/затворена врата.
 
 ## License
 
