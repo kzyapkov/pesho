@@ -28,6 +28,27 @@ The rest of this page is in Bulgarian and should not be read by anyone.
 и през HTTP. За тестове и дебъгване, HUP сигнал към процеса на
 демона също ще отключи или заключи бравата.
 
+## Строене
+
+За успешен билд ти трябва Go Workspace, виж в Google. После трябва
+да упоменеш, че крос-компилираш за arm6:
+
+    # tell go we're cross-compiling for arm6 (rpi):
+    export GOOS=linux
+    export GOARCH=arm
+    export GOARM=6
+
+и накрая, от тази директория:
+
+    pwd
+        ...github.com/kzyapkov/pesho
+    go build .
+    ls -al ./pesho
+
+така получения `pesho` е статично линкнатото bin-че което седи
+в /root/pesho и се пуска със `systemctl start pesho`.
+
+
 ## License
 
       Copyright (c) 2014, initLab <vloo@initlab.org>
