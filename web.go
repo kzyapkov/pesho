@@ -55,24 +55,42 @@ func (p *pesho) handleStatus(w http.ResponseWriter, r *http.Request) {
 func (p *pesho) httpServer(cfg config.WebConfig) {
 	defer p.workers.Done()
 
-	http.Handle("/status", restrictMethod(http.HandlerFunc(p.handleStatus), "GET"))
-	http.Handle("/lock", restrictMethod(http.HandlerFunc(p.handleLock), "POST"))
-	http.Handle("/unlock", restrictMethod(http.HandlerFunc(p.handleUnlock), "POST"))
+	http.Handle("/status",
+		checkMagic(restrictMethod(http.HandlerFunc(p.handleStatus), "GET"), cfg.Key))
+	http.Handle("/lock",
+		checkMagic(restrictMethod(http.HandlerFunc(p.handleLock), "POST"), cfg.Key))
+	http.Handle("/unlock",
+		checkMagic(restrictMethod(http.HandlerFunc(p.handleUnlock), "POST"), cfg.Key))
 
-	var err error
 	// fix this to be a real server with control over the listener
 	if cfg.Listen != "" {
 		go func() {
-			if err = http.ListenAndServe(cfg.Listen, nil); err != nil {
+			if err := http.ListenAndServe(cfg.Listen, nil); err != nil {
 				log.Fatalf("web: %v", err)
 			}
 		}()
 	}
 	if cfg.TLS != nil {
-		log.Print("TLS not yet implemented")
+		go func() {
+			if err := http.ListenAndServeTLS(
+				cfg.TLS.Listen, cfg.TLS.CertFile, cfg.TLS.KeyFile, nil); err != nil {
+				log.Fatalf("web.TLS: %v", err)
+			}
+		}()
 	}
 
 	<-p.dying
+}
+
+func checkMagic(h http.Handler, key string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqKey := r.FormValue("key")
+		if reqKey != key {
+			http.Error(w, "Bad key", http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func restrictMethod(h http.Handler, methods ...string) http.Handler {

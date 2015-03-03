@@ -16,6 +16,7 @@ type TLSConfig struct {
 
 type WebConfig struct {
 	Listen string
+	Key    string
 	TLS    *TLSConfig
 }
 
@@ -73,6 +74,7 @@ var defaultCfg = Config{
 	},
 	Web: WebConfig{
 		Listen: ":80",
+		Key:    "asdfasdfqwer",
 	},
 }
 
