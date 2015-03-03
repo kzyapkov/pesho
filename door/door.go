@@ -1,4 +1,4 @@
-// Package implements the interface to an actual door lock and its
+// Package door implements the interface to an actual door lock and its
 // associated sensors, controls and logic.
 package door
 
@@ -199,7 +199,11 @@ func (d *Door) moveLatch(target LatchState) error {
 
 	if d.state.Door == Open {
 		log.Print("movelLatch: Door is open")
-		return ErrBusy
+		if target != Unlocked {
+			log.Print("movelLatch: Door is open, won't try locking.")
+			return ErrBusy
+		}
+		log.Print("moveLatch: Door is open, but let's unlock anyway...")
 	}
 
 	// Handle no-op cases
@@ -218,7 +222,6 @@ func (d *Door) moveLatch(target LatchState) error {
 		log.Printf("moveLatch: state is unknown, but we are brave.")
 	}
 
-	// We're in transit. Let others kill us via killCurrent
 	var inFlight LatchState
 	if target == Locked {
 		inFlight = Locking

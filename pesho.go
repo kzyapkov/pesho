@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/kzyapkov/pesho/config"
 	"github.com/kzyapkov/pesho/door"
@@ -144,15 +145,17 @@ func (p *pesho) buttonHandler(btns *buttons) {
 				}
 				if pendingLock {
 					log.Print("RedButton: lock is already pending, close the door!")
-					log.Print("")
 					continue
 				}
+				pendingLock = true
 				go func() {
 					doorEvents := p.door.Subscribe(nil)
 					defer p.door.Unsubscribe(doorEvents)
 					for {
 						evt := <-doorEvents
 						if evt.New.IsClosed() {
+							// waaaait for it!
+							<-time.After(1500 * time.Millisecond)
 							pendingLock = false
 							p.door.Lock()
 							return
@@ -185,6 +188,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not init door GPIOs: %v", err)
 	}
+
+	b, err := newButtons(cfg.Buttons.Red, cfg.Buttons.Green)
+	if err != nil {
+		log.Fatalf("Could not init button GPIOs: %v", err)
+	}
+
 	p := &pesho{
 		door:      d,
 		closeOnce: &sync.Once{},
@@ -202,10 +211,6 @@ func main() {
 	p.workers.Add(1)
 	go p.hangupHandler()
 
-	b, err := newButtons(cfg.Buttons.Red, cfg.Buttons.Green)
-	if err != nil {
-		log.Fatalf("Could not init button GPIOs: %v", err)
-	}
 	p.workers.Add(1)
 	go p.buttonHandler(b)
 
