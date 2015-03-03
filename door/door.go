@@ -31,6 +31,7 @@ type Door struct {
 
 	// to kill a current Lock/Unlock
 	killCurrent chan chan struct{}
+	dying       chan struct{}
 
 	subsMutex *sync.Mutex
 	subs      *sub
@@ -57,8 +58,16 @@ func (s *State) IsOpen() bool {
 	return s.Door == Open
 }
 
+func (s *State) IsClosed() bool {
+	return s.Door == Closed
+}
+
 func (s *State) IsLocked() bool {
 	return s.Latch == Locked
+}
+
+func (s *State) IsUnlocked() bool {
+	return s.Latch == Unlocked
 }
 
 func (s *State) IsInFlight() bool {
@@ -83,6 +92,11 @@ const (
 	Locking
 	Unlocking
 	Unknown
+)
+
+const (
+	DoorHWEvent int = iota
+	LockHWEvent
 )
 
 func (l LatchState) String() string {
@@ -147,9 +161,46 @@ func (d *Door) Unlock() error {
 	return d.moveLatch(Unlocked)
 }
 
+func (d *Door) monitorPins() {
+	toggle := make(chan int)
+	d.sensors.door.BeginWatch(gpio.EdgeBoth, func() {
+		toggle <- DoorHWEvent
+	})
+	d.sensors.locked.BeginWatch(gpio.EdgeBoth, func() {
+		toggle <- LockHWEvent
+	})
+	d.sensors.unlocked.BeginWatch(gpio.EdgeBoth, func() {
+		toggle <- LockHWEvent
+	})
+
+	for {
+		select {
+		case <-d.dying:
+			return
+		case <-toggle:
+			log.Printf("monitorPins: door=%s; locked=%s; unlocked=%s",
+				d.sensors.door.Get(), d.sensors.locked.Get(), d.sensors.unlocked.Get())
+
+			if d.state.IsInFlight() {
+				continue
+			}
+			var newState State
+			d.sensors.fetchDoorState(&newState)
+			d.sensors.fetchLatchState(&newState)
+			// notify() will update d.state
+			d.notify(newState)
+		}
+	}
+}
+
 func (d *Door) moveLatch(target LatchState) error {
 	d.state.Lock()
 	defer d.state.Unlock()
+
+	if d.state.Door == Open {
+		log.Print("movelLatch: Door is open")
+		return ErrBusy
+	}
 
 	// Handle no-op cases
 	switch d.state.Latch {
@@ -160,10 +211,11 @@ func (d *Door) moveLatch(target LatchState) error {
 
 	case Locking:
 	case Unlocking:
-	case Unknown:
 		log.Printf("moveLatch: now busy with %s, ErrBusy-ing out", d.state.Latch.String())
 		// TODO: maybe handle some of these better
 		return ErrBusy
+	case Unknown:
+		log.Printf("moveLatch: state is unknown, but we are brave.")
 	}
 
 	// We're in transit. Let others kill us via killCurrent
@@ -181,40 +233,39 @@ func (d *Door) moveLatch(target LatchState) error {
 	d.state.Unlock()
 
 	var ret error
-	select {
-	case <-time.After(200 * time.Millisecond):
-		d.controls.stopMotor()
-		d.state.Lock()
-		d.state.Latch = target
+	<-time.After(200 * time.Millisecond)
+	d.controls.stopMotor()
+	<-time.After(300 * time.Millisecond)
+
+	var newState State
+
+	d.sensors.fetchDoorState(&newState)
+	d.sensors.fetchLatchState(&newState)
+
+	d.state.Lock()
+
+	if (newState.IsLocked() && target == Locked) || (!newState.IsLocked() && target == Unlocked) {
 		ret = nil
-	case killed := <-d.killCurrent:
-		d.controls.stopMotor()
-		d.state.Lock()
-		d.state.Latch = Unknown
-		if killed != nil {
-			close(killed)
-		}
-		ret = errors.New("locking was interrupted")
-	}
-	if d.killCurrent != nil {
-		close(d.killCurrent)
-		d.killCurrent = nil
-	}
-	if ret != nil {
-		log.Printf("moveLatch: error: %s", ret)
 	} else {
-		log.Printf("moveLatch: returning %s", ret)
+		ret = ErrBusy
 	}
+
+	d.state.Latch = newState.Latch
+	d.state.Door = newState.Door
+
+	log.Print("moveLatch: all is good")
 	return ret
 }
 
 func (d *Door) notify(new State) {
-	// TODO: implement these notifications
-	//       with a single long-living goroutine and a channel
 	go func() {
 		d.state.Lock()
 		defer d.state.Unlock()
+
 		old := *d.state.State
+		if old.Same(&new) {
+			return
+		}
 		d.state.State = &new
 		var evt *DoorEvent = &DoorEvent{old, new, time.Now()}
 
@@ -279,6 +330,8 @@ func (d *Door) Unsubscribe(c <-chan *DoorEvent) error {
 }
 
 func (d *Door) Close() error {
+	close(d.dying)
+	// verify cleanup!
 	return nil
 }
 
@@ -289,8 +342,8 @@ type sensors struct {
 	door     gpio.Pin
 }
 
-// updateLatchState doesn't know about transitions
-func (s *sensors) updateLatchState(state *State) {
+// fetchLatchState doesn't know about transitions
+func (s *sensors) fetchLatchState(state *State) {
 	isLocked := !s.locked.Get()
 	isUnlocked := !s.unlocked.Get()
 	if isLocked == isUnlocked {
@@ -304,7 +357,7 @@ func (s *sensors) updateLatchState(state *State) {
 	}
 }
 
-func (s *sensors) updateDoorState(state *State) {
+func (s *sensors) fetchDoorState(state *State) {
 	isClosed := !s.door.Get()
 	if isClosed {
 		state.Door = Closed
@@ -385,6 +438,12 @@ func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
 
 	d.state.State = &State{}
 	d.state.Mutex = &sync.Mutex{}
+	go d.monitorPins()
+
+	var theState State
+	d.sensors.fetchDoorState(&theState)
+	d.sensors.fetchLatchState(&theState)
+	d.notify(theState)
 
 	return d, nil
 }

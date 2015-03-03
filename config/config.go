@@ -53,17 +53,18 @@ var defaultCfg = Config{
 			// Latch* move the locking mechanism back and forth
 			// with an H-bridge driver
 			LatchEnable: 26,
-			LatchLock:   13,
-			LatchUnlock: 19,
+			LatchLock:   19,
+			LatchUnlock: 13,
 
 			// input GPIOs
 			// Locked and Unlocked are wired to the same SP-DT switch
 			SenseLocked:   16,
-			SenseUnlocked: 20,
+			SenseUnlocked: 21,
+
 			// Hall-effect sensor for the door
-			SenseDoor: 21,
+			SenseDoor: 20,
 		},
-		LatchMoveTime: 150, // in ms
+		LatchMoveTime: 200, // in ms
 	},
 	Buttons: ButtonsConfig{
 		// GPIOs for the big red and green buttons

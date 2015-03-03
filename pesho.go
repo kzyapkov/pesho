@@ -80,6 +80,9 @@ func (p *pesho) stateMonitor() {
 		case <-p.dying:
 			return
 		case evt := <-doorEvents:
+			if evt.New.IsInFlight() {
+				continue
+			}
 			log.Printf("Now %s, was %s at %s\n", evt.New.String(), evt.Old.String(), evt.When)
 		}
 	}
@@ -96,7 +99,9 @@ func (p *pesho) hangupHandler() {
 		case <-toggle:
 			state := p.door.State()
 			log.Printf("SIGHUP: %v", state)
-			if state.IsLocked() {
+			if state.IsInFlight() {
+				log.Printf("SIGHUP: door is %s, try again later", state.Latch.String())
+			} else if state.IsLocked() {
 				log.Print("SIGHUP: Trying Unlock...")
 				go func() {
 					var err = p.door.Unlock()
@@ -119,17 +124,44 @@ func (p *pesho) hangupHandler() {
 
 func (p *pesho) buttonHandler(btns *buttons) {
 	defer p.workers.Done()
+	var pendingLock bool = false
 	for {
 		select {
 		case <-p.dying:
 			return
 		case b := <-btns.Presses:
+			ds := p.door.State()
+			if ds.IsInFlight() {
+				log.Print("buttonHandler: Latch is currently in transit")
+				continue
+			}
 			if b == RedButton {
-				log.Print("Red button pressed, locking")
-				p.door.Lock()
+				log.Print("RedButton!")
+				if ds.IsClosed() {
+					log.Print("RedButton: door is closed, locking immediately")
+					p.door.Lock()
+					continue
+				}
+				if pendingLock {
+					log.Print("RedButton: lock is already pending, close the door!")
+					log.Print("")
+					continue
+				}
+				go func() {
+					doorEvents := p.door.Subscribe(nil)
+					defer p.door.Unsubscribe(doorEvents)
+					for {
+						evt := <-doorEvents
+						if evt.New.IsClosed() {
+							pendingLock = false
+							p.door.Lock()
+							return
+						}
+					}
+				}()
 			} else {
-				log.Print("Green button pressed, locking")
-				p.door.Unlock()
+				log.Print("Green button pressed, unlocking")
+				go p.door.Unlock()
 			}
 		}
 	}
@@ -153,10 +185,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not init door GPIOs: %v", err)
 	}
-	b, err := newButtons(cfg.Buttons.Red, cfg.Buttons.Green)
-	if err != nil {
-		log.Fatalf("Could not init button GPIOs: %v", err)
-	}
 	p := &pesho{
 		door:      d,
 		closeOnce: &sync.Once{},
@@ -174,6 +202,10 @@ func main() {
 	p.workers.Add(1)
 	go p.hangupHandler()
 
+	b, err := newButtons(cfg.Buttons.Red, cfg.Buttons.Green)
+	if err != nil {
+		log.Fatalf("Could not init button GPIOs: %v", err)
+	}
 	p.workers.Add(1)
 	go p.buttonHandler(b)
 
