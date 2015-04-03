@@ -53,7 +53,6 @@ The rest of this page is in Bulgarian and should not be read by anyone.
 ## Следва
 
 * Да следим захранването.
-* Да нотифицираме нещо за отворена/затворена врата.
 
 ## License
 
