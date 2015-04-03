@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
@@ -89,6 +91,31 @@ func (p *pesho) stateMonitor() {
 	}
 }
 
+func (p *pesho) webNotifier(notifyUrl string) {
+	defer p.workers.Done()
+	events := p.door.Subscribe(nil)
+	defer p.door.Unsubscribe(events)
+
+	for {
+		select {
+		case <-p.dying:
+			return
+		case evt := <-events:
+			if evt.New.IsInFlight() {
+				continue
+			}
+			data := url.Values{}
+			data.Set("door", evt.New.Door.String())
+			data.Set("latch", evt.New.Latch.String())
+			log.Printf("Notifying for %s: %s", evt.New, data)
+			_, err := http.PostForm(notifyUrl, data)
+			if err != nil {
+				log.Printf("Web notification failed: %s", err)
+			}
+		}
+	}
+}
+
 func (p *pesho) hangupHandler() {
 	defer p.workers.Done()
 	toggle := make(chan os.Signal)
@@ -108,6 +135,8 @@ func (p *pesho) hangupHandler() {
 					var err = p.door.Unlock()
 					if err != nil {
 						log.Printf("SIGHUP: Unlock: %v", err)
+					} else {
+						log.Print("SIGHUP: Unlock OK")
 					}
 				}()
 			} else {
@@ -116,6 +145,8 @@ func (p *pesho) hangupHandler() {
 					var err = p.door.Lock()
 					if err != nil {
 						log.Printf("Lock: %v", err)
+					} else {
+						log.Print("SIGHUP: Lock OK")
 					}
 				}()
 			}
@@ -156,8 +187,8 @@ func (p *pesho) buttonHandler(btns *buttons) {
 						if evt.New.IsClosed() {
 							// waaaait for it!
 							<-time.After(1500 * time.Millisecond)
-							pendingLock = false
 							p.door.Lock()
+							pendingLock = false
 							return
 						}
 					}
@@ -213,6 +244,12 @@ func main() {
 
 	p.workers.Add(1)
 	go p.buttonHandler(b)
+
+	if len(cfg.NotificationURL) != 0 {
+		log.Printf("Sending notifications at %s", cfg.NotificationURL)
+		p.workers.Add(1)
+		go p.webNotifier(cfg.NotificationURL)
+	}
 
 	p.workers.Wait()
 }
