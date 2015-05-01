@@ -35,6 +35,8 @@ type Door struct {
 	subs      *sub
 	events    chan DoorEvent
 
+	closeOnce sync.Once
+
 	// State() State                                // The current state of the door
 	// Lock() error                                 // Lock, blocks for outcome
 	// Unlock() error                               // Unlock, blocks for outcome
@@ -329,10 +331,12 @@ func (d *Door) Unsubscribe(c <-chan *DoorEvent) error {
 	return ErrNotSubscribed
 }
 
-func (d *Door) Close() error {
+func (d *Door) Close() {
+	d.closeOnce.Do(d.close)
+}
+
+func (d *Door) close() {
 	close(d.dying)
-	// verify cleanup!
-	return nil
 }
 
 // GPIO inputs
@@ -436,6 +440,7 @@ func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
 		subsMutex: &sync.Mutex{},
 	}
 
+	d.dying = make(chan struct{})
 	d.state.State = &State{}
 	d.state.Mutex = &sync.Mutex{}
 	go d.monitorPins()
