@@ -29,9 +29,7 @@ type Door struct {
 		*sync.Mutex
 	}
 
-	// to kill a current Lock/Unlock
-	killCurrent chan chan struct{}
-	dying       chan struct{}
+	dying chan struct{}
 
 	subsMutex *sync.Mutex
 	subs      *sub
@@ -232,7 +230,6 @@ func (d *Door) moveLatch(target LatchState) error {
 	}
 	log.Printf("moveLatch: now %s", inFlight.String())
 	d.state.Latch = inFlight
-	d.killCurrent = make(chan chan struct{})
 	d.state.Unlock()
 
 	var ret error
