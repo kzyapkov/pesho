@@ -42,10 +42,11 @@ type ButtonsConfig struct {
 }
 
 type Config struct {
-	Door            DoorConfig
-	Buttons         ButtonsConfig
-	Web             WebConfig
-	NotificationURL string
+	Door                    DoorConfig
+	Buttons                 ButtonsConfig
+	Web                     WebConfig
+	NotificationURL         string
+	SecretNotificationToken string
 }
 
 var defaultCfg = Config{

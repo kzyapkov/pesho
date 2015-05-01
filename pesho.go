@@ -91,7 +91,7 @@ func (p *pesho) stateMonitor() {
 	}
 }
 
-func (p *pesho) webNotifier(notifyUrl string) {
+func (p *pesho) webNotifier(notifyUrl string, secretToken string) {
 	defer p.workers.Done()
 	events := p.door.Subscribe(nil)
 	defer p.door.Unsubscribe(events)
@@ -108,6 +108,9 @@ func (p *pesho) webNotifier(notifyUrl string) {
 			data.Set("door", evt.New.Door.String())
 			data.Set("latch", evt.New.Latch.String())
 			log.Printf("Notifying for %s: %s", evt.New, data)
+			if len(secretToken) != 0 {
+				data.Set("token", secretToken)
+			}
 			_, err := http.PostForm(notifyUrl, data)
 			if err != nil {
 				log.Printf("Web notification failed: %s", err)
@@ -248,7 +251,7 @@ func main() {
 	if len(cfg.NotificationURL) != 0 {
 		log.Printf("Sending notifications at %s", cfg.NotificationURL)
 		p.workers.Add(1)
-		go p.webNotifier(cfg.NotificationURL)
+		go p.webNotifier(cfg.NotificationURL, cfg.SecretNotificationToken)
 	}
 
 	p.workers.Wait()
