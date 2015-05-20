@@ -11,7 +11,6 @@ import (
 
 	"github.com/kzyapkov/gpio"
 	"github.com/kzyapkov/pesho/config"
-	"github.com/kzyapkov/pesho/util"
 )
 
 var (
@@ -28,6 +27,8 @@ type Door struct {
 		*State
 		*sync.Mutex
 	}
+
+	lastState State
 
 	dying chan struct{}
 
@@ -178,8 +179,8 @@ func (d *Door) monitorPins() {
 		case <-d.dying:
 			return
 		case <-toggle:
-			log.Printf("monitorPins: door=%s; locked=%s; unlocked=%s",
-				d.sensors.door.Get(), d.sensors.locked.Get(), d.sensors.unlocked.Get())
+			// log.Printf("monitorPins: door=%s; locked=%s; unlocked=%s",
+			// 	d.sensors.door.Get(), d.sensors.locked.Get(), d.sensors.unlocked.Get())
 
 			if d.state.IsInFlight() {
 				continue
@@ -428,9 +429,9 @@ func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
 
 	d = &Door{
 		sensors: &sensors{
-			locked:   util.Debounced(mustPin(cfg.Pins.SenseLocked, gpio.ModeInput), 10*time.Millisecond),
-			unlocked: util.Debounced(mustPin(cfg.Pins.SenseUnlocked, gpio.ModeInput), 10*time.Millisecond),
-			door:     util.Debounced(mustPin(cfg.Pins.SenseDoor, gpio.ModeInput), 10*time.Millisecond),
+			locked:   mustPin(cfg.Pins.SenseLocked, gpio.ModeInput),
+			unlocked: mustPin(cfg.Pins.SenseUnlocked, gpio.ModeInput),
+			door:     mustPin(cfg.Pins.SenseDoor, gpio.ModeInput),
 		},
 		controls: &controls{
 			enable: mustPin(cfg.Pins.LatchEnable, gpio.ModeLow),
