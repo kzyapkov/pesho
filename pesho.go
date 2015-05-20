@@ -111,10 +111,11 @@ func (p *pesho) webNotifier(notifyUrl string, secretToken string) {
 			if len(secretToken) != 0 {
 				data.Set("token", secretToken)
 			}
-			_, err := http.PostForm(notifyUrl, data)
+			res, err := http.PostForm(notifyUrl, data)
 			if err != nil {
 				log.Printf("Web notification failed: %s", err)
 			}
+			res.Body.Close()
 		}
 	}
 }
