@@ -130,7 +130,7 @@ func (p *pesho) hangupHandler() {
 			return
 		case <-toggle:
 			state := p.door.State()
-			log.Printf("SIGHUP: %v", state)
+			log.Printf("SIGHUP: found state %v", state)
 			if state.IsInFlight() {
 				log.Printf("SIGHUP: door is %s, try again later", state.Latch.String())
 			} else if state.IsLocked() {

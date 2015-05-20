@@ -5,7 +5,6 @@ package door
 import (
 	"errors"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,10 +22,7 @@ type Door struct {
 	sensors  *sensors
 	controls *controls
 
-	state struct {
-		*State
-		*sync.Mutex
-	}
+	state ProtectedState
 
 	lastState State
 
@@ -37,111 +33,33 @@ type Door struct {
 	events    chan DoorEvent
 
 	closeOnce sync.Once
-
-	// State() State                                // The current state of the door
-	// Lock() error                                 // Lock, blocks for outcome
-	// Unlock() error                               // Unlock, blocks for outcome
-	// Close() error                                // Cleanup resources
-	// Subscribe(chan *DoorEvent) <-chan *DoorEvent // Notifies all for each new state
-	// Unsubscribe(<-chan *DoorEvent) error         // Channel will get no more notifications of events
 }
 
-type State struct {
-	Latch LatchState `json:"latch"` // Position of the latch (or bolt): locked (extended), unlocked (retracted) or transitioning
-	Door  DoorState  `json:"door"`  // Reed switch readout
+type ProtectedState struct {
+	*State
+	*sync.Mutex
 }
 
-func (s *State) String() string {
-	return "State{Door: " + s.Door.String() + ", Latch: " + s.Latch.String() + "}"
+func (ps *ProtectedState) lockedGet() (s State) {
+	ps.Lock()
+	s = *ps.State
+	ps.Unlock()
+	return
 }
 
-func (s *State) IsOpen() bool {
-	return s.Door == Open
+func (ps *ProtectedState) lockedSet(new State) (changed bool, old State) {
+	ps.Lock()
+	old = *ps.State
+	*ps.State = new
+	ps.Unlock()
+	changed = !old.Same(&new)
+	return
 }
-
-func (s *State) IsClosed() bool {
-	return s.Door == Closed
-}
-
-func (s *State) IsLocked() bool {
-	return s.Latch == Locked
-}
-
-func (s *State) IsUnlocked() bool {
-	return s.Latch == Unlocked
-}
-
-func (s *State) IsInFlight() bool {
-	switch s.Latch {
-	case Locking:
-	case Unlocking:
-		return true
-	default:
-	}
-	return false
-}
-
-func (s *State) Same(other *State) bool {
-	return (s.Latch == other.Latch && s.Door == other.Door)
-}
-
-type LatchState int
-
-const (
-	Locked LatchState = iota
-	Unlocked
-	Locking
-	Unlocking
-	Unknown
-)
 
 const (
 	DoorHWEvent int = iota
 	LockHWEvent
 )
-
-func (l LatchState) String() string {
-	switch l {
-	case Locked:
-		return "Locked"
-	case Unlocked:
-		return "Unlocked"
-	case Locking:
-		return "Locking"
-	case Unlocking:
-		return "Unlocking"
-	case Unknown:
-		return "Unknown"
-	default:
-		return "**FIXME**"
-	}
-}
-
-func (l LatchState) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + strings.ToLower(l.String()) + `"`), nil
-}
-
-type DoorState int
-
-const (
-	Open DoorState = iota
-	Closed
-)
-
-func (d DoorState) String() string {
-	switch d {
-	case Closed:
-		return "Closed"
-	case Open:
-		return "Open"
-	default:
-		return "**FIXME**"
-	}
-}
-
-func (d DoorState) MarshalJSON() ([]byte, error) {
-	return []byte((`"` + strings.ToLower(d.String()) + `"`)), nil
-}
 
 type DoorEvent struct {
 	Old, New State
@@ -182,14 +100,20 @@ func (d *Door) monitorPins() {
 			// log.Printf("monitorPins: door=%s; locked=%s; unlocked=%s",
 			// 	d.sensors.door.Get(), d.sensors.locked.Get(), d.sensors.unlocked.Get())
 
-			if d.state.IsInFlight() {
+			s := d.state.lockedGet()
+			if s.IsInFlight() {
 				continue
 			}
-			var newState State
-			d.sensors.fetchDoorState(&newState)
-			d.sensors.fetchLatchState(&newState)
-			// notify() will update d.state
-			d.notify(newState)
+			var new State
+			d.sensors.fetchDoorState(&new)
+			d.sensors.fetchLatchState(&new)
+			if changed, old := d.state.lockedSet(new); changed {
+				log.Printf("monitorPins: notifying for %s -> %s",
+					old.String(), new.String())
+				d.notify(old, new)
+			} else {
+				log.Printf("monitorPins: pins moved, but no door state change")
+			}
 		}
 	}
 }
@@ -231,6 +155,8 @@ func (d *Door) moveLatch(target LatchState) error {
 		inFlight = Unlocking
 		d.controls.startUnlocking()
 	}
+
+	old := *d.state.State
 	log.Printf("moveLatch: now %s", inFlight.String())
 	d.state.Latch = inFlight
 	d.state.Unlock()
@@ -238,38 +164,33 @@ func (d *Door) moveLatch(target LatchState) error {
 	var ret error
 	<-time.After(200 * time.Millisecond)
 	d.controls.stopMotor()
-	<-time.After(300 * time.Millisecond)
+	<-time.After(150 * time.Millisecond)
 
-	var newState State
-
-	d.sensors.fetchDoorState(&newState)
-	d.sensors.fetchLatchState(&newState)
-
+	var new State
 	d.state.Lock()
+	d.sensors.fetchDoorState(&new)
+	d.sensors.fetchLatchState(&new)
 
-	if (newState.IsLocked() && target == Locked) || (!newState.IsLocked() && target == Unlocked) {
+	d.state.Door = new.Door
+	d.state.Latch = new.Latch
+
+	if (new.IsLocked() && target == Locked) || (new.IsUnlocked() && target == Unlocked) {
 		ret = nil
 	} else {
 		ret = ErrBusy
 	}
 
-	d.state.Latch = newState.Latch
-	d.state.Door = newState.Door
+	d.notify(old, new)
 
-	log.Print("moveLatch: all is good")
+	log.Printf("moveLatch: state at exit: %s", new.String())
 	return ret
 }
 
-func (d *Door) notify(new State) {
+func (d *Door) notify(old, new State) {
+	// if old.Same(&new) {
+	// 	return
+	// }
 	go func() {
-		d.state.Lock()
-		defer d.state.Unlock()
-
-		old := *d.state.State
-		if old.Same(&new) {
-			return
-		}
-		d.state.State = &new
 		var evt *DoorEvent = &DoorEvent{old, new, time.Now()}
 
 		d.subsMutex.Lock()
@@ -444,12 +365,16 @@ func NewFromConfig(cfg config.DoorConfig) (d *Door, err error) {
 	d.dying = make(chan struct{})
 	d.state.State = &State{}
 	d.state.Mutex = &sync.Mutex{}
-	go d.monitorPins()
+	d.state.State.Door = NotChecked
+	d.state.State.Latch = Unknown
 
-	var theState State
-	d.sensors.fetchDoorState(&theState)
-	d.sensors.fetchLatchState(&theState)
-	d.notify(theState)
+	var found State
+	d.sensors.fetchDoorState(&found)
+	d.sensors.fetchLatchState(&found)
+	_, old := d.state.lockedSet(found)
+	d.notify(old, found)
+
+	go d.monitorPins()
 
 	return d, nil
 }
